@@ -33,7 +33,7 @@ class AMQP(object):
         self.persister_thread.start()
 
     def persist(self, record):
-        routing_key = "%s.%s" % (record.source, record.msg)
+        routing_key = ("%s.%s" % (record.source, record.msg))[:128]
         body = serialize_json(record)
 
         self.publish_queue.put({
