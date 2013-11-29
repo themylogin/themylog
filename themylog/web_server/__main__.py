@@ -37,6 +37,7 @@ if __name__ == "__main__":
             feed = None
 
         response = Response("[" + ",".join(map(serialize_json,retriever.retrieve(feed))) + "]",
+                            headers=[("Access-Control-Allow-Origin", "*")],
                             mimetype="application/json")
         return response(environ, start_response)
 
