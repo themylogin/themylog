@@ -1,8 +1,12 @@
+import datetime
 import json
 
 
 class Encoder(json.JSONEncoder):
     def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+
         try:
             return super(Encoder, self).default(obj)
         except TypeError:
@@ -10,6 +14,4 @@ class Encoder(json.JSONEncoder):
 
 
 def serialize_json(record):
-    d = record._asdict()
-    d["datetime"] = d["datetime"].isoformat()
-    return Encoder().encode(d)
+    return Encoder().encode(record._asdict())
