@@ -73,19 +73,46 @@ def get_feed_tree_condition(condition):
         return (operator.and_, get_feed_tree_condition_part(*condition[0]), get_feed_tree_condition(condition[1:]))
 
 def get_feed_tree_condition_part(key, value):
-    op = operator.eq
-    val = value.strip()
-    for sym, sym_op in (("!=", operator.ne),
-                        ("<=", operator.le),
-                        (">=", operator.ge),
-                        ("<", operator.lt),
-                        (">", operator.gt)):
-        if val.startswith(sym):
-            op = sym_op
-            val = yaml.load(val[len(sym):].strip())
-            break
+    field = lambda get_record_key: get_record_key(key)
+
+    if isinstance(value, list):
+        return feed_field_in(field, process_feed_value(key, value))
+    else:
+        op = operator.eq
+        value = value.strip()
+        for sym, sym_op in (("!=", operator.ne),
+                            ("<=", operator.le),
+                            (">=", operator.ge),
+                            ("<", operator.lt),
+                            (">", operator.gt)):
+            if value.startswith(sym):
+                op = sym_op
+                value = yaml.load(value[len(sym):].strip())
+                break
+
+        if isinstance(value, list):
+            if op == operator.ne:
+                return (operator.not_, feed_field_in(field, process_feed_value(key, value)))
+            else:
+                raise ValueError("Lists do not support operator %s" % op.__name__)
+        else:
+            return (op, field, process_feed_value(key, value))
+
+
+def process_feed_value(key, value):
+    if isinstance(value, list):
+        return [process_feed_value(key, v) for v in value]
 
     if key == "level":
-        val = levels[val]
+        return levels[value]
+    else:
+        return value
 
-    return (op, lambda get_record_key: get_record_key(key), val)
+
+def feed_field_in(field, value):
+    if len(value) == 0:
+        return False
+    elif len(value) == 1:
+        return (operator.eq, field, value[0])
+    else:
+        return (operator.or_, feed_field_in(field, [value[0]]), feed_field_in(field, value[1:]))

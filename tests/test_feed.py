@@ -42,14 +42,14 @@ class FeedContainsTestCase(unittest.TestCase):
         f = self.createFeedFromYaml("""
         exclude:
             -
-                source: sync_scrobbles_daemon
+                application: sync_scrobbles_daemon
                 level: < warning
 
         """)
 
-        self.expectFeedContainsRecord(f, {"source": "smarthome", "level": levels["info"]}, True)
-        self.expectFeedContainsRecord(f, {"source": "sync_scrobbles_daemon", "level": levels["info"]}, False)
-        self.expectFeedContainsRecord(f, {"source": "sync_scrobbles_daemon", "level": levels["warning"]}, True)
+        self.expectFeedContainsRecord(f, {"application": "smarthome", "level": levels["info"]}, True)
+        self.expectFeedContainsRecord(f, {"application": "sync_scrobbles_daemon", "level": levels["info"]}, False)
+        self.expectFeedContainsRecord(f, {"application": "sync_scrobbles_daemon", "level": levels["warning"]}, True)
 
     def test_compound_exclude(self):
         f = self.createFeedFromYaml("""
@@ -57,11 +57,40 @@ class FeedContainsTestCase(unittest.TestCase):
             -
                 level: < info
             -
-                source: sync_scrobbles_daemon
+                application: sync_scrobbles_daemon
                 level: < warning
         """)
 
-        self.expectFeedContainsRecord(f, {"source": "smarthome", "level": levels["info"]}, True)
-        self.expectFeedContainsRecord(f, {"source": "smarthome", "level": levels["debug"]}, False)
-        self.expectFeedContainsRecord(f, {"source": "sync_scrobbles_daemon", "level": levels["info"]}, False)
-        self.expectFeedContainsRecord(f, {"source": "sync_scrobbles_daemon", "level": levels["warning"]}, True)
+        self.expectFeedContainsRecord(f, {"application": "smarthome", "level": levels["info"]}, True)
+        self.expectFeedContainsRecord(f, {"application": "smarthome", "level": levels["debug"]}, False)
+        self.expectFeedContainsRecord(f, {"application": "sync_scrobbles_daemon", "level": levels["info"]}, False)
+        self.expectFeedContainsRecord(f, {"application": "sync_scrobbles_daemon", "level": levels["warning"]}, True)
+
+    def test_in_list(self):
+        f = self.createFeedFromYaml("""
+        exclude:
+            -
+                application: [paramiko.transport, werkzeug]
+        """)
+
+        self.expectFeedContainsRecord(f, {"application": "paramiko.transport"}, False)
+        self.expectFeedContainsRecord(f, {"application": "werkzeug"}, False)
+        self.expectFeedContainsRecord(f, {"application": "smarthome"}, True)
+
+    def test_not_list(self):
+        f = self.createFeedFromYaml("""
+        include:
+            -
+                application: "!= [paramiko.transport, werkzeug]"
+        """)
+
+        self.expectFeedContainsRecord(f, {"application": "paramiko.transport"}, False)
+        self.expectFeedContainsRecord(f, {"application": "werkzeug"}, False)
+        self.expectFeedContainsRecord(f, {"application": "smarthome"}, True)
+
+    def test_bad_list_operator(self):
+        self.assertRaises(ValueError, self.createFeedFromYaml, """
+        include:
+            -
+                application: < [paramiko.transport, werkzeug]
+        """)
