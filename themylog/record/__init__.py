@@ -1,3 +1,3 @@
 from collections import namedtuple
 
-Record = namedtuple("Record", ["datetime", "source", "level", "msg", "args", "explanation"])
+Record = namedtuple("Record", ["datetime", "application", "logger", "level", "msg", "args", "explanation"])

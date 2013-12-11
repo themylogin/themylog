@@ -17,9 +17,11 @@ def parse_json(text):
     return Record(**d)
 
 
-def parse_plaintext(text, default_datetime=None, default_source=None, default_level=levels["warning"]):
+def parse_plaintext(text, default_datetime=None, default_application=None, default_logger=None,
+                    default_level=levels["warning"]):
     datetime_ = default_datetime or datetime.now()
-    source = default_source
+    application = default_application
+    logger_ = default_logger
     level = default_level
     msg = ""
     args = {}
@@ -42,8 +44,11 @@ def parse_plaintext(text, default_datetime=None, default_source=None, default_le
                         except ValueError:
                             logger.info("Unable to parse datetime '%s', defaulting to '%s'", value, datetime_)
 
-                    elif key == "source":
-                        source = value
+                    elif key == "application":
+                        application = value
+
+                    elif key == "logger":
+                        logger_ = value
 
                     elif key == "level":
                         try:
@@ -74,5 +79,5 @@ def parse_plaintext(text, default_datetime=None, default_source=None, default_le
                     explanation.append(line)
                     headers_read = True
 
-    return Record(datetime=datetime_, source=source, level=level, msg=msg, args=args,
+    return Record(datetime=datetime_, application=application, logger=logger_, level=level, msg=msg, args=args,
                   explanation="\n".join(explanation))

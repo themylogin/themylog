@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import logging
 import os
 from Queue import Queue
 import SocketServer
@@ -34,7 +35,16 @@ class StreamSocketServerHandler(SocketServer.BaseRequestHandler):
 class StreamSocketServer(object):
     implements(IReceiver)
 
-    def __init__(self, server_factory, server_address):
+    def __init__(self, format, server_factory, server_address):
+        self.format = format
+        try:
+            self.parse = {
+                "json": lambda address, text: parse_json(text),
+                "text": lambda address, text: parse_plaintext(text, default_application=address, default_logger="root"),
+            }[self.format]
+        except KeyError:
+            raise Exception("Unknown format: '%s'" % format)
+
         self.server = server_factory(server_address, StreamSocketServerHandler)
         self.server.queue = Queue()
 
@@ -45,21 +55,22 @@ class StreamSocketServer(object):
     def receive(self):
         while True:
             address, text = self.server.queue.get()
+
             try:
-                yield parse_json(text)
+                yield self.parse(address, text)
             except (TypeError, ValueError):
-                yield parse_plaintext(text, default_source=address)
+                logging.exception("Unable to parse following message from %r: %s", address, text)
 
 
 class TCPServer(StreamSocketServer):
-    def __init__(self, host, port):
-        super(TCPServer, self).__init__(SocketServer.ThreadingTCPServer, (host, port))
+    def __init__(self, host, port, format="json"):
+        super(TCPServer, self).__init__(format, SocketServer.ThreadingTCPServer, (host, port))
 
 
 if hasattr(SocketServer, "ThreadingUnixStreamServer"):
     class UnixServer(StreamSocketServer):
-        def __init__(self, path):
+        def __init__(self, path, format="json"):
             if os.path.exists(path):
                 os.unlink(path)
 
-            super(UnixServer, self).__init__(SocketServer.ThreadingUnixStreamServer, path)
+            super(UnixServer, self).__init__(format, SocketServer.ThreadingUnixStreamServer, path)

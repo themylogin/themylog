@@ -28,22 +28,6 @@ class GetLevelTestCase(unittest.TestCase):
         r = self.create_fake_record(level=logging.WARNING, exc_info=(Exception,))
         self.assertEqual(h._get_level(r), "error")
 
-    def test_record_from_specific_logger(self):
-        h = LoggingHandler(None, loggers_levels={"a": "debug", "b": "info"})
-        r = self.create_fake_record(level=logging.WARNING)
-        r_a = self.create_fake_record(level=logging.WARNING, name="a")
-        r_b = self.create_fake_record(level=logging.WARNING, name="b")
-        self.assertEqual(h._get_level(r), "warning")
-        self.assertEqual(h._get_level(r_a), "debug")
-        self.assertEqual(h._get_level(r_b), "info")
-
-    def test_exception_record_from_specific_logger(self):
-        h = LoggingHandler(None, loggers_levels={"a": "debug"})
-        r = self.create_fake_record(name="a", level=logging.WARNING)
-        r_e = self.create_fake_record(name="a", level=logging.WARNING, exc_info=(Exception,))
-        self.assertEqual(h._get_level(r), "debug")
-        self.assertEqual(h._get_level(r_e), "debug")
-
 
 class UnderscoreMessageTestCase(unittest.TestCase):
     def setUp(self):

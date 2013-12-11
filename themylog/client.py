@@ -18,11 +18,11 @@ class Client(object):
         config = read_config(config or find_config())
 
         for receiver in get_receivers(config):
-            if receiver.class_ == "UnixServer":
+            if receiver.class_ == "UnixServer" and receiver.args.get("format", "json") == "json":
                 self.unix_socket = receiver.args["path"]
                 break
         else:
-            raise MisconfigurationError("No UnixServer receiver found in %s" % config)
+            raise MisconfigurationError("No UnixServer receiver that accepts json found in %s" % config)
 
     def log(self, record):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -32,21 +32,21 @@ class Client(object):
 
 
 class LoggingHandler(logging.Handler):
-    def __init__(self, source, exception_level="debug", loggers_levels={}, config=None):
+    def __init__(self, application, exception_level="debug", config=None):
         super(LoggingHandler, self).__init__()
 
-        self.source = source
+        self.application = application
         self.exception_level = exception_level
-        self.loggers_levels = dict(loggers_levels)
 
         self.client = Client(config)
 
     def emit(self, record):
         try:
             rec = Record(datetime=datetime.fromtimestamp(record.created),
-                         source=self.source,
+                         application=self.application,
+                         logger=record.name,
                          level=levels[self._get_level(record)],
-                         msg="%s.%s" % (record.name, self._underscore_message(str(record.msg))),
+                         msg=self._underscore_message(str(record.msg)),
                          args=record.__dict__,
                          explanation=self.format(record))
             self.client.log(rec)
@@ -67,9 +67,6 @@ class LoggingHandler(logging.Handler):
                 logging.ERROR: "error",
                 logging.CRITICAL: "error",
             }[record.levelno]
-
-        if record.name in self.loggers_levels:
-            level = self.loggers_levels[record.name]
 
         return level
 

@@ -27,7 +27,8 @@ class SQLRecord(Base):
     __tablename__ = "log"
 
     id          = Column(BigInteger, primary_key=True)
-    source      = Column(String(length=255))
+    application = Column(String(length=255))
+    logger      = Column(String(length=255))
     datetime    = Column(DateTime())
     level       = Column(Integer())
     msg         = Column(Text())
