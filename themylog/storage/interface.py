@@ -7,5 +7,5 @@ class IPersister(zope.interface.Interface):
 
 
 class IRetriever(zope.interface.Interface):
-    def retrieve(self, feed=None):
+    def retrieve(self, feed=None, limit=50):
         """Retrieve records matching conditions from the storage"""

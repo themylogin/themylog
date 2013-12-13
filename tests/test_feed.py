@@ -18,47 +18,49 @@ class FeedContainsTestCase(unittest.TestCase):
 
         self.assertEqual(feed.contains(record), contains)
 
-    def test_simple_exclude(self):
+    def test_simple_reject(self):
         f = self.createFeedFromYaml("""
-        exclude:
             -
                 level: < report
+                action: reject
         """)
 
         self.expectFeedContainsRecord(f, {"level": levels["info"]}, False)
         self.expectFeedContainsRecord(f, {"level": levels["report"]}, True)
 
-    def test_simple_include(self):
+    def test_simple_accept(self):
         f = self.createFeedFromYaml("""
-        include:
             -
                 level: ">= report"
+                action: accept
+            -
+                action: reject
         """)
 
         self.expectFeedContainsRecord(f, {"level": levels["info"]}, False)
         self.expectFeedContainsRecord(f, {"level": levels["report"]}, True)
 
-    def test_simple_exclude_with_multiple_keys(self):
+    def test_simple_reject_with_multiple_keys(self):
         f = self.createFeedFromYaml("""
-        exclude:
             -
                 application: sync_scrobbles_daemon
                 level: < warning
-
+                action: reject
         """)
 
         self.expectFeedContainsRecord(f, {"application": "smarthome", "level": levels["info"]}, True)
         self.expectFeedContainsRecord(f, {"application": "sync_scrobbles_daemon", "level": levels["info"]}, False)
         self.expectFeedContainsRecord(f, {"application": "sync_scrobbles_daemon", "level": levels["warning"]}, True)
 
-    def test_compound_exclude(self):
+    def test_multiple_reject(self):
         f = self.createFeedFromYaml("""
-        exclude:
             -
                 level: < info
+                action: reject
             -
                 application: sync_scrobbles_daemon
                 level: < warning
+                action: reject
         """)
 
         self.expectFeedContainsRecord(f, {"application": "smarthome", "level": levels["info"]}, True)
@@ -68,9 +70,9 @@ class FeedContainsTestCase(unittest.TestCase):
 
     def test_in_list(self):
         f = self.createFeedFromYaml("""
-        exclude:
             -
                 application: [paramiko.transport, werkzeug]
+                action: reject
         """)
 
         self.expectFeedContainsRecord(f, {"application": "paramiko.transport"}, False)
@@ -79,9 +81,11 @@ class FeedContainsTestCase(unittest.TestCase):
 
     def test_not_list(self):
         f = self.createFeedFromYaml("""
-        include:
             -
                 application: "!= [paramiko.transport, werkzeug]"
+                action: accept
+            -
+                action: reject
         """)
 
         self.expectFeedContainsRecord(f, {"application": "paramiko.transport"}, False)
@@ -90,7 +94,7 @@ class FeedContainsTestCase(unittest.TestCase):
 
     def test_bad_list_operator(self):
         self.assertRaises(ValueError, self.createFeedFromYaml, """
-        include:
             -
                 application: < [paramiko.transport, werkzeug]
+                action: reject
         """)

@@ -36,7 +36,9 @@ if __name__ == "__main__":
         else:
             feed = None
 
-        response = Response("[" + ",".join(map(serialize_json,retriever.retrieve(feed))) + "]",
+        limit = request.args.get("limit", 50, int)
+
+        response = Response("[" + ",".join(map(serialize_json, retriever.retrieve(feed, limit))) + "]",
                             headers=[("Access-Control-Allow-Origin", "*")],
                             mimetype="application/json")
         return response(environ, start_response)

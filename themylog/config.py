@@ -45,38 +45,51 @@ def create_storages(config):
             for storage in get_storages(config)]
 
 def get_feeds(config):
-    return {feed: get_feed(description) for feed, description in config["feeds"].items()}
+    return {feed: get_feed(rules) for feed, rules in config["feeds"].items()}
 
-def get_feed(description):
-    return Feed(get_feed_tree(*description.items()[0]))
+def get_feed(rules):
+    return Feed(get_rules_tree(rules))
 
-def get_feed_tree(action, conditions):
-    op = {"include": lambda x: x,
-          "exclude": operator.not_}[action]
-
-    return (op, get_feed_tree_conditions(conditions))
-
-def get_feed_tree_conditions(conditions):
-    if len(conditions) == 0:
-        return False
-    elif len(conditions) == 1:
-        return get_feed_tree_condition(conditions[0].items())
-    else:
-        return (operator.or_, get_feed_tree_condition(conditions[0].items()), get_feed_tree_conditions(conditions[1:]))
-
-def get_feed_tree_condition(condition):
-    if len(condition) == 0:
+def get_rules_tree(rules):
+    if len(rules) == 0:
         return True
-    elif len(condition) == 1:
-        return get_feed_tree_condition_part(*condition[0])
     else:
-        return (operator.and_, get_feed_tree_condition_part(*condition[0]), get_feed_tree_condition(condition[1:]))
+        conditions, action = parse_rule(rules[0])
 
-def get_feed_tree_condition_part(key, value):
+        conditions_tree = get_conditions_tree(conditions.items())
+        tail = get_rules_tree(rules[1:])
+
+        if action == "accept":
+            return (operator.or_, conditions_tree, tail)
+        if action == "reject":
+            return (operator.and_, (operator.not_, conditions_tree), tail)
+        raise NotImplementedError
+
+def parse_rule(rule):
+    if "action" in rule:
+        action = rule["action"].lower()
+        if action in ["accept", "reject"]:
+            conditions = dict(rule)
+            del conditions["action"]
+            return conditions, action
+        else:
+            raise Exception("Action should be either 'accept' or 'reject' not '%s'" % action)
+    else:
+        raise Exception("The following rule must contain action:\n%s" % yaml.dump(rule, default_flow_style=False))
+
+def get_conditions_tree(conditions):
+    if len(conditions) == 0:
+        return True
+    elif len(conditions) == 1:
+        return get_condition_tree(*conditions[0])
+    else:
+        return (operator.and_, get_condition_tree(*conditions[0]), get_conditions_tree(conditions[1:]))
+
+def get_condition_tree(key, value):
     field = lambda get_record_key: get_record_key(key)
 
     if isinstance(value, list):
-        return feed_field_in(field, process_feed_value(key, value))
+        return condition_value_in(field, process_condition_value(key, value))
     else:
         op = operator.eq
         value = value.strip()
@@ -92,16 +105,16 @@ def get_feed_tree_condition_part(key, value):
 
         if isinstance(value, list):
             if op == operator.ne:
-                return (operator.not_, feed_field_in(field, process_feed_value(key, value)))
+                return (operator.not_, condition_value_in(field, process_condition_value(key, value)))
             else:
                 raise ValueError("Lists do not support operator %s" % op.__name__)
         else:
-            return (op, field, process_feed_value(key, value))
+            return (op, field, process_condition_value(key, value))
 
 
-def process_feed_value(key, value):
+def process_condition_value(key, value):
     if isinstance(value, list):
-        return [process_feed_value(key, v) for v in value]
+        return [process_condition_value(key, v) for v in value]
 
     if key == "level":
         return levels[value]
@@ -109,10 +122,10 @@ def process_feed_value(key, value):
         return value
 
 
-def feed_field_in(field, value):
+def condition_value_in(field, value):
     if len(value) == 0:
         return False
     elif len(value) == 1:
         return (operator.eq, field, value[0])
     else:
-        return (operator.or_, feed_field_in(field, [value[0]]), feed_field_in(field, value[1:]))
+        return (operator.or_, condition_value_in(field, [value[0]]), condition_value_in(field, value[1:]))

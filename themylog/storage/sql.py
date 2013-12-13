@@ -56,7 +56,7 @@ class SQL(object):
     def persist(self, record):
         self.query_queue.put(SQLRecord.__table__.insert().values(**record._asdict()))
 
-    def retrieve(self, feed=None):
+    def retrieve(self, feed=None, limit=50):
         query = self._create_session().query(SQLRecord)
 
         if feed:
@@ -67,7 +67,7 @@ class SQL(object):
         return [Record(**{k: getattr(record, k) for k in Record._fields})
                 for record in query.\
                               order_by(SQLRecord.id.desc())
-                              [:50]]
+                              [:limit]]
 
     def _persister_thread(self):
         while True:

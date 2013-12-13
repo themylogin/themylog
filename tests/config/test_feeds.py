@@ -6,7 +6,7 @@ from themylog.level import levels
 
 class FeedConditionPartTestCase(unittest.TestCase):
     def expectResult(self, config_key, config_value, op, record_key, value):
-        t = config.get_feed_tree_condition_part(config_key, config_value)
+        t = config.get_condition_tree(config_key, config_value)
         self.assertEqual(t[0], op)
         self.assertEqual(t[1](lambda x: x), record_key)
         self.assertEqual(t[2], value)
