@@ -29,6 +29,8 @@ class FeedContainsTestCase(unittest.TestCase):
             -
                 level: < report
                 action: reject
+            -
+                action: accept
         """)
 
         self.expect_feed_contains_record(f, {"level": levels["info"]}, False)
@@ -39,8 +41,6 @@ class FeedContainsTestCase(unittest.TestCase):
             -
                 level: ">= report"
                 action: accept
-            -
-                action: reject
         """)
 
         self.expect_feed_contains_record(f, {"level": levels["info"]}, False)
@@ -52,6 +52,8 @@ class FeedContainsTestCase(unittest.TestCase):
                 application: sync_scrobbles_daemon
                 level: < warning
                 action: reject
+            -
+                action: accept
         """)
 
         self.expect_feed_contains_record(f, {"application": "smarthome", "level": levels["info"]}, True)
@@ -67,6 +69,8 @@ class FeedContainsTestCase(unittest.TestCase):
                 application: sync_scrobbles_daemon
                 level: < warning
                 action: reject
+            -
+                action: accept
         """)
 
         self.expect_feed_contains_record(f, {"application": "smarthome", "level": levels["info"]}, True)
@@ -79,6 +83,8 @@ class FeedContainsTestCase(unittest.TestCase):
             -
                 application: [paramiko.transport, werkzeug]
                 action: reject
+            -
+                action: accept
         """)
 
         self.expect_feed_contains_record(f, {"application": "paramiko.transport"}, False)
@@ -90,8 +96,6 @@ class FeedContainsTestCase(unittest.TestCase):
             -
                 application: "!= [paramiko.transport, werkzeug]"
                 action: accept
-            -
-                action: reject
         """)
 
         self.expect_feed_contains_record(f, {"application": "paramiko.transport"}, False)
@@ -103,6 +107,8 @@ class FeedContainsTestCase(unittest.TestCase):
             -
                 application: < [paramiko.transport, werkzeug]
                 action: reject
+            -
+                action: accept
         """)
 
     def test_common_and_quotient_begins_with_accept(self):
@@ -117,6 +123,8 @@ class FeedContainsTestCase(unittest.TestCase):
             -
                 application: werkzeug
                 action: reject
+            -
+                action: accept
         """)
 
         self.expect_feed_contains_record(f, {"application": "smarthome", "logger": "bell"}, True)
@@ -141,6 +149,8 @@ class FeedContainsTestCase(unittest.TestCase):
             -
                 application: werkzeug
                 action: reject
+            -
+                action: accept
         """)
 
         self.expect_feed_contains_record(f, {"application": "smarthome", "logger": "bell", "msg": "down"}, True)

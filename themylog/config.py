@@ -64,9 +64,9 @@ def get_feed(rules):
     return Feed(get_rules_tree(rules))
 
 
-def get_rules_tree(rules):
+def get_rules_tree(rules, accept_by_default=False):
     if len(rules) == 0:
-        return True
+        return accept_by_default
     else:
         conditions, action = parse_rule(rules[0])
 
