@@ -15,7 +15,7 @@ if __name__ == "__main__":
     storages = filter(lambda storage: ICleaner.providedBy(storage), storages)
 
     if not storages:
-        raise Exception("You don't have any storage that implements ICleaner")
+        raise Exception("You don't have any storages that implements ICleaner")
 
     """Get cleanups"""
 
