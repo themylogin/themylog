@@ -7,6 +7,7 @@ from Queue import Queue
 from sqlalchemy import create_engine
 from sqlalchemy import Column
 from sqlalchemy import BigInteger, DateTime, Integer, PickleType, String, Text
+from sqlalchemy import literal
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import create_session
 from threading import Thread
@@ -14,7 +15,7 @@ import time
 from zope.interface import implements
 
 from themylog.record import Record
-from themylog.storage.interface import IPersister, IRetriever
+from themylog.storage.interface import IPersister, IRetriever, ICleaner
 
 __all__ = ["SQL"]
 
@@ -37,7 +38,7 @@ class SQLRecord(Base):
 
 
 class SQL(object):
-    implements(IPersister, IRetriever)
+    implements(IPersister, IRetriever, ICleaner)
 
     def __init__(self, dsn):
         self.dsn = dsn
@@ -57,17 +58,13 @@ class SQL(object):
         self.query_queue.put(SQLRecord.__table__.insert().values(**record._asdict()))
 
     def retrieve(self, feed=None, limit=50):
-        query = self._create_session().query(SQLRecord)
-
-        if feed:
-            query = query.filter(feed.make_expr(lambda key: getattr(SQLRecord, key), {
-                operator.not_: operator.inv,
-            }))
-
         return [Record(**{k: getattr(record, k) for k in Record._fields})
-                for record in query.\
+                for record in self._create_query(feed).\
                               order_by(SQLRecord.id.desc())
                               [:limit]]
+
+    def cleanup(self, feed, older_than):
+        self._create_query(feed).filter(SQLRecord.datetime < older_than).delete()
 
     def _persister_thread(self):
         while True:
@@ -88,3 +85,18 @@ class SQL(object):
 
     def _create_session(self):
         return create_session(create_engine(self.dsn))
+
+    def _create_query(self, feed):
+        query = self._create_session().query(SQLRecord)
+
+        if feed:
+            query = query.filter(feed.make_expr(lambda key: getattr(SQLRecord, key), constant_map={
+                # Constant expressions such as (operator.not_, True) are evalauted in-place; however, as operator.not_
+                # is substituted with operator.inv_, (operator.inv_, True) is -2. This is not what being expected.
+                True: literal(True),
+                False: literal(False),
+            }, operator_map={
+                operator.not_: operator.inv,
+            }))
+
+        return query

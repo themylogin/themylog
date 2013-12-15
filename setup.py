@@ -13,6 +13,7 @@ setup(
     long_description=open('README.md').read(),
     install_requires=[
         "zope.interface >= 4.0.5",
+        "isodate",
     ],
     setup_requires=[
         "nose>=1.0"

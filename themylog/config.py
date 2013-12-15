@@ -1,4 +1,6 @@
 from collections import namedtuple
+from datetime import datetime
+import isodate
 import operator
 import os
 import yaml
@@ -30,25 +32,37 @@ def find_config():
 def read_config(config):
     return yaml.load(open(config))
 
+
 def get_receivers(config):
     return [ReceiverEntity(class_=d.keys()[0], args=d.values()[0]) for d in config["receivers"]]
+
 
 def create_receivers(config):
     return [getattr(themylog.receiver, receiver.class_)(**receiver.args)
             for receiver in get_receivers(config)]
 
+
 def get_storages(config):
     return [StorageEntity(class_=d.keys()[0], args=d.values()[0]) for d in config["storages"]]
+
 
 def create_storages(config):
     return [getattr(themylog.storage, storage.class_)(**storage.args)
             for storage in get_storages(config)]
 
+
 def get_feeds(config):
     return {feed: get_feed(rules) for feed, rules in config["feeds"].items()}
 
+
+def get_cleanups(config):
+    return [(isodate.parse_duration(cleanup["period"]), get_feed(cleanup["records"]))
+            for cleanup in config.get("cleanup", [])]
+
+
 def get_feed(rules):
     return Feed(get_rules_tree(rules))
+
 
 def get_rules_tree(rules):
     if len(rules) == 0:
@@ -65,6 +79,7 @@ def get_rules_tree(rules):
             return (operator.and_, (operator.not_, conditions_tree), tail)
         raise NotImplementedError
 
+
 def parse_rule(rule):
     if "action" in rule:
         action = rule["action"].lower()
@@ -77,6 +92,7 @@ def parse_rule(rule):
     else:
         raise Exception("The following rule must contain action:\n%s" % yaml.dump(rule, default_flow_style=False))
 
+
 def get_conditions_tree(conditions):
     if len(conditions) == 0:
         return True
@@ -84,6 +100,7 @@ def get_conditions_tree(conditions):
         return get_condition_tree(*conditions[0])
     else:
         return (operator.and_, get_condition_tree(*conditions[0]), get_conditions_tree(conditions[1:]))
+
 
 def get_condition_tree(key, value):
     field = lambda get_record_key: get_record_key(key)
