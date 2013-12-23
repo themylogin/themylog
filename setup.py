@@ -16,6 +16,7 @@ setup(
         "isodate",
     ],
     setup_requires=[
-        "nose>=1.0"
+        "nose>=1.0",
+        "testfixtures"
     ],
 )

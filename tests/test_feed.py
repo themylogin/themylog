@@ -12,7 +12,7 @@ class FeedContainsTestCase(unittest.TestCase):
         return get_feed(yaml.load(textwrap.dedent(feed_yaml)))
 
     def expect_feed_contains_record(self, feed, record_dict, contains):
-        record = Mock
+        record = Mock()
         for k, v in record_dict.items():
             setattr(record, k, v)
 

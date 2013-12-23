@@ -5,8 +5,10 @@ import operator
 import os
 import yaml
 
-from themylog.level import levels
+from themylog.disorder import Disorder
+import themylog.disorder.seeker
 from themylog.feed import Feed
+from themylog.level import levels
 import themylog.receiver
 import themylog.storage
 
@@ -26,7 +28,7 @@ def find_config():
         if os.path.exists(config) and os.access(config, os.R_OK):
             return config
 
-    raise ConfigNotFound("No readable config found. Places checked: %s" % configs)
+    raise ConfigNotFound("No readable config found. Places checked: %s" % (configs,))
 
 
 def read_config(config):
@@ -58,6 +60,10 @@ def get_feeds(config):
 def get_cleanups(config):
     return [(isodate.parse_duration(cleanup["period"]), get_feed(cleanup["records"]))
             for cleanup in config.get("cleanup", [])]
+
+
+def get_disorders(config):
+    return {k: get_disorder(**v) for k, v in config.get("disorders", []).items()}
 
 
 def get_feed(rules):
@@ -146,3 +152,12 @@ def condition_value_in(field, value):
         return (operator.eq, field, value[0])
     else:
         return (operator.or_, condition_value_in(field, [value[0]]), condition_value_in(field, value[1:]))
+
+
+def get_disorder(title, **kwargs):
+    kwargs["right"] = get_feed(kwargs["right"])
+    kwargs["wrong"] = get_feed(kwargs["wrong"])
+    if "period" in kwargs:
+        kwargs["period"] = isodate.parse_duration(kwargs["period"])
+
+    return Disorder(title, themylog.disorder.seeker.DisorderSeeker(**kwargs))
