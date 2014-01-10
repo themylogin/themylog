@@ -9,7 +9,7 @@ from zope.interface import implements
 
 from themylog.feed import IFeedsAware
 from themylog.record.serializer import serialize_json
-from themylog.storage.interface import IPersister
+from themylog.handler.interface import IHandler
 
 __all__ = ["AMQP"]
 
@@ -18,7 +18,7 @@ logging.getLogger("pika").setLevel(logging.WARNING)
 
 
 class AMQP(object):
-    implements(IPersister, IFeedsAware)
+    implements(IHandler, IFeedsAware)
 
     def __init__(self, exchange):
         self.exchange = exchange
@@ -32,7 +32,7 @@ class AMQP(object):
         self.persister_thread.daemon = True
         self.persister_thread.start()
 
-    def persist(self, record):
+    def handle(self, record):
         routing_key = ("%s.%s.%s" % (record.application, record.logger, record.msg))[:128]
         body = serialize_json(record)
 

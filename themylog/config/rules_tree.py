@@ -1,73 +1,7 @@
-from collections import namedtuple
-from datetime import datetime
-import isodate
 import operator
-import os
 import yaml
 
-from themylog.disorder import Disorder
-import themylog.disorder.seeker
-from themylog.feed import Feed
 from themylog.level import levels
-import themylog.receiver
-import themylog.storage
-
-
-class ConfigNotFound(Exception):
-    pass
-
-
-ReceiverEntity = namedtuple("ReceiverEntity", ["class_", "args"])
-StorageEntity = namedtuple("StorageEntity", ["class_", "args"])
-
-
-def find_config():
-    configs = (os.path.expanduser("~/.config/themylog.yaml"), "/etc/themylog.yaml")
-
-    for config in configs:
-        if os.path.exists(config) and os.access(config, os.R_OK):
-            return config
-
-    raise ConfigNotFound("No readable config found. Places checked: %s" % (configs,))
-
-
-def read_config(config):
-    return yaml.load(open(config))
-
-
-def get_receivers(config):
-    return [ReceiverEntity(class_=d.keys()[0], args=d.values()[0]) for d in config["receivers"]]
-
-
-def create_receivers(config):
-    return [getattr(themylog.receiver, receiver.class_)(**receiver.args)
-            for receiver in get_receivers(config)]
-
-
-def get_storages(config):
-    return [StorageEntity(class_=d.keys()[0], args=d.values()[0]) for d in config["storages"]]
-
-
-def create_storages(config):
-    return [getattr(themylog.storage, storage.class_)(**storage.args)
-            for storage in get_storages(config)]
-
-
-def get_feeds(config):
-    return {feed: get_feed(rules) for feed, rules in config["feeds"].items()}
-
-
-def get_cleanups(config):
-    return [(isodate.parse_duration(cleanup["period"]), get_feed(cleanup["records"]))
-            for cleanup in config.get("cleanup", [])]
-
-
-def get_disorders(config):
-    return {k: get_disorder(**v) for k, v in config.get("disorders", []).items()}
-
-
-def get_feed(rules):
-    return Feed(get_rules_tree(rules))
 
 
 def get_rules_tree(rules, accept_by_default=False):
@@ -152,12 +86,3 @@ def condition_value_in(field, value):
         return (operator.eq, field, value[0])
     else:
         return (operator.or_, condition_value_in(field, [value[0]]), condition_value_in(field, value[1:]))
-
-
-def get_disorder(title, **kwargs):
-    kwargs["right"] = get_feed(kwargs["right"])
-    kwargs["wrong"] = get_feed(kwargs["wrong"])
-    if "period" in kwargs:
-        kwargs["period"] = isodate.parse_duration(kwargs["period"])
-
-    return Disorder(title, themylog.disorder.seeker.DisorderSeeker(**kwargs))

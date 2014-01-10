@@ -14,8 +14,9 @@ from threading import Thread
 import time
 from zope.interface import implements
 
+from themylog.rules_tree.evaluator import Evaluator
 from themylog.record import Record
-from themylog.storage.interface import IPersister, IRetriever, ICleaner
+from themylog.handler.interface import IHandler, IRetrieveCapable, ICleanupCapable
 
 __all__ = ["SQL"]
 
@@ -38,12 +39,25 @@ class SQLRecord(Base):
 
 
 class SQL(object):
-    implements(IPersister, IRetriever, ICleaner)
+    implements(IHandler, IRetrieveCapable, ICleanupCapable)
 
     def __init__(self, dsn):
         self.dsn = dsn
 
         self.query_queue = Queue()
+
+        self.rules_tree_evaluator = Evaluator(
+            lambda key: getattr(SQLRecord, key),
+            constant_map={
+                # Constant expressions such as (operator.not_, True) are evalauted in-place; however, as operator.not_
+                # is substituted with operator.inv_, (operator.inv_, True) is -2. This is not what being expected.
+                True: literal(True),
+                False: literal(False),
+            },
+            operator_map={
+                operator.not_: operator.inv,
+            }
+        )
 
         self.persister_thread = Thread(target=self._persister_thread)
         self.persister_thread.daemon = True
@@ -54,17 +68,17 @@ class SQL(object):
         except:
             logger.exception("An exception occurred while issuing Base.metadata.create_all")
 
-    def persist(self, record):
+    def handle(self, record):
         self.query_queue.put(SQLRecord.__table__.insert().values(**record._asdict()))
 
-    def retrieve(self, feed=None, limit=50):
+    def retrieve(self, rules_tree, limit):
         return [Record(**{k: getattr(record, k) for k in Record._fields})
-                for record in self._create_query(feed).\
+                for record in self._create_query(rules_tree).\
                               order_by(SQLRecord.id.desc())
                               [:limit]]
 
-    def cleanup(self, feed, older_than):
-        self._create_query(feed).filter(SQLRecord.datetime < older_than).delete()
+    def cleanup(self, rules_tree, older_than):
+        self._create_query(rules_tree).filter(SQLRecord.datetime < older_than).delete()
 
     def _persister_thread(self):
         while True:
@@ -86,17 +100,10 @@ class SQL(object):
     def _create_session(self):
         return create_session(create_engine(self.dsn))
 
-    def _create_query(self, feed):
+    def _create_query(self, rules_tree):
         query = self._create_session().query(SQLRecord)
 
-        if feed:
-            query = query.filter(feed.make_expr(lambda key: getattr(SQLRecord, key), constant_map={
-                # Constant expressions such as (operator.not_, True) are evalauted in-place; however, as operator.not_
-                # is substituted with operator.inv_, (operator.inv_, True) is -2. This is not what being expected.
-                True: literal(True),
-                False: literal(False),
-            }, operator_map={
-                operator.not_: operator.inv,
-            }))
+        if rules_tree:
+            query = query.filter(self.rules_tree_evaluator.eval(rules_tree))
 
         return query

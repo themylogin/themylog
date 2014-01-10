@@ -2,7 +2,10 @@ import logging
 from Queue import Queue
 from threading import Thread
 
-from themylog.config import find_config, read_config, create_receivers, create_storages, get_feeds
+from themylog.config import find_config, read_config
+from themylog.config.receivers import create_receivers
+from themylog.config.handlers import create_handlers
+from themylog.config.feeds import get_feeds
 from themylog.feed import IFeedsAware
 
 if __name__ == "__main__":
@@ -23,26 +26,26 @@ if __name__ == "__main__":
 
         return receiver_thread
 
-    for r in receivers:
-        receiver_thread = Thread(target=receiver_thread_factory(r))
+    for receiver in receivers:
+        receiver_thread = Thread(target=receiver_thread_factory(receiver))
         receiver_thread.daemon = True
         receiver_thread.start()
 
-    """Create storages"""
+    """Create handlers"""
 
-    storages = create_storages(config)
+    handlers = create_handlers(config)
 
     """Create feeds"""
 
     feeds = get_feeds(config)
 
-    for storage in storages:
-        if IFeedsAware.providedBy(storage):
-            storage.set_feeds(feeds)
+    for handler in handlers:
+        if IFeedsAware.providedBy(handler):
+            handler.set_feeds(feeds)
 
     """Main loop"""
 
     while True:
         record = record_queue.get()
-        for storage in storages:
-            storage.persist(record)
+        for handler in handlers:
+            handler.handle(record)

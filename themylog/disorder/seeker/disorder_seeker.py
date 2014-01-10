@@ -5,6 +5,7 @@ from zope.interface import implements
 
 from themylog.disorder.seeker.abstract import AbstractDisorderSeeker
 from themylog.disorder.seeker.interface import IDisorderSeeker, IReplayable
+from themylog.rules_tree import match_record
 
 __all__ = ["DisorderSeeker"]
 
@@ -20,10 +21,10 @@ class DisorderSeeker(AbstractDisorderSeeker):
         self.last_seeker_record_received_at = None
 
     def receive_record(self, record):
-        if self.wrong.contains(record):
+        if match_record(self.wrong, record):
             self.there_is_disorder(record)
             self.last_seeker_record_received_at = record.datetime
-        elif self.right.contains(record):
+        elif match_record(self.right, record):
             self.there_is_no_disorder(record)
             self.last_seeker_record_received_at = record.datetime
         else:

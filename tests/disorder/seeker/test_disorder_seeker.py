@@ -5,7 +5,7 @@ import textwrap
 import unittest
 import yaml
 
-from themylog.config import get_disorder
+from themylog.config.disorders import get_disorder
 from themylog.level import levels
 
 

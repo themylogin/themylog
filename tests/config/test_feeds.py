@@ -1,25 +1,160 @@
-import operator
+from mock import Mock
+import textwrap
 import unittest
+import yaml
 
-import themylog.config as config
+from themylog.config.feeds import get_feed
 from themylog.level import levels
 
-class FeedConditionPartTestCase(unittest.TestCase):
-    def expectResult(self, config_key, config_value, op, record_key, value):
-        t = config.get_condition_tree(config_key, config_value)
-        self.assertEqual(t[0], op)
-        self.assertEqual(t[1](lambda x: x), record_key)
-        self.assertEqual(t[2], value)
-        self.assertEqual(len(t), 3)
 
-    def test_simple_eq(self):
-        self.expectResult("source", "sync_scrobbles_daemon",
-                          operator.eq, "source", "sync_scrobbles_daemon")
+class FeedContainsTestCase(unittest.TestCase):
+    def create_feed_from_yaml(self, feed_yaml):
+        return get_feed(yaml.load(textwrap.dedent(feed_yaml)))
 
-    def test_simple_le(self):
-        self.expectResult("some_numeric_key", "<= 5",
-                          operator.le, "some_numeric_key", 5)
+    def expect_feed_contains_record(self, feed, record_dict, contains):
+        record = Mock()
+        for k, v in record_dict.items():
+            setattr(record, k, v)
 
-    def test_level(self):
-        self.expectResult("level", "> info",
-                          operator.gt, "level", levels["info"])
+        self.assertEqual(feed.contains(record), contains)
+
+    def test_no_action(self):
+        self.assertRaises(Exception, self.create_feed_from_yaml, """
+            -
+                level: < report
+        """)
+
+    def test_simple_reject(self):
+        f = self.create_feed_from_yaml("""
+            -
+                level: < report
+                action: reject
+            -
+                action: accept
+        """)
+
+        self.expect_feed_contains_record(f, {"level": levels["info"]}, False)
+        self.expect_feed_contains_record(f, {"level": levels["report"]}, True)
+
+    def test_simple_accept(self):
+        f = self.create_feed_from_yaml("""
+            -
+                level: ">= report"
+                action: accept
+        """)
+
+        self.expect_feed_contains_record(f, {"level": levels["info"]}, False)
+        self.expect_feed_contains_record(f, {"level": levels["report"]}, True)
+
+    def test_simple_reject_with_multiple_keys(self):
+        f = self.create_feed_from_yaml("""
+            -
+                application: sync_scrobbles_daemon
+                level: < warning
+                action: reject
+            -
+                action: accept
+        """)
+
+        self.expect_feed_contains_record(f, {"application": "smarthome", "level": levels["info"]}, True)
+        self.expect_feed_contains_record(f, {"application": "sync_scrobbles_daemon", "level": levels["info"]}, False)
+        self.expect_feed_contains_record(f, {"application": "sync_scrobbles_daemon", "level": levels["warning"]}, True)
+
+    def test_multiple_reject(self):
+        f = self.create_feed_from_yaml("""
+            -
+                level: < info
+                action: reject
+            -
+                application: sync_scrobbles_daemon
+                level: < warning
+                action: reject
+            -
+                action: accept
+        """)
+
+        self.expect_feed_contains_record(f, {"application": "smarthome", "level": levels["info"]}, True)
+        self.expect_feed_contains_record(f, {"application": "smarthome", "level": levels["debug"]}, False)
+        self.expect_feed_contains_record(f, {"application": "sync_scrobbles_daemon", "level": levels["info"]}, False)
+        self.expect_feed_contains_record(f, {"application": "sync_scrobbles_daemon", "level": levels["warning"]}, True)
+
+    def test_in_list(self):
+        f = self.create_feed_from_yaml("""
+            -
+                application: [paramiko.transport, werkzeug]
+                action: reject
+            -
+                action: accept
+        """)
+
+        self.expect_feed_contains_record(f, {"application": "paramiko.transport"}, False)
+        self.expect_feed_contains_record(f, {"application": "werkzeug"}, False)
+        self.expect_feed_contains_record(f, {"application": "smarthome"}, True)
+
+    def test_not_list(self):
+        f = self.create_feed_from_yaml("""
+            -
+                application: "!= [paramiko.transport, werkzeug]"
+                action: accept
+        """)
+
+        self.expect_feed_contains_record(f, {"application": "paramiko.transport"}, False)
+        self.expect_feed_contains_record(f, {"application": "werkzeug"}, False)
+        self.expect_feed_contains_record(f, {"application": "smarthome"}, True)
+
+    def test_bad_list_operator(self):
+        self.assertRaises(ValueError, self.create_feed_from_yaml, """
+            -
+                application: < [paramiko.transport, werkzeug]
+                action: reject
+            -
+                action: accept
+        """)
+
+    def test_common_and_quotient_begins_with_accept(self):
+        f = self.create_feed_from_yaml("""
+            -
+                application: smarthome
+                logger: bell
+                action: accept
+            -
+                application: smarthome
+                action: reject
+            -
+                application: werkzeug
+                action: reject
+            -
+                action: accept
+        """)
+
+        self.expect_feed_contains_record(f, {"application": "smarthome", "logger": "bell"}, True)
+        self.expect_feed_contains_record(f, {"application": "smarthome", "logger": "bathroom_door"}, False)
+        self.expect_feed_contains_record(f, {"application": "werkzeug"}, False)
+        self.expect_feed_contains_record(f, {"application": "serega"}, True)
+
+    def test_common_and_quotient_begins_with_reject(self):
+        f = self.create_feed_from_yaml("""
+            -
+                application: smarthome
+                logger: bell
+                msg: up
+                action: reject
+            -
+                application: smarthome
+                logger: bell
+                action: accept
+            -
+                application: smarthome
+                action: reject
+            -
+                application: werkzeug
+                action: reject
+            -
+                action: accept
+        """)
+
+        self.expect_feed_contains_record(f, {"application": "smarthome", "logger": "bell", "msg": "down"}, True)
+        self.expect_feed_contains_record(f, {"application": "smarthome", "logger": "bell", "msg": "up"}, False)
+        self.expect_feed_contains_record(f, {"application": "smarthome", "logger": "bathroom_door"}, False)
+        self.expect_feed_contains_record(f, {"application": "werkzeug"}, False)
+        self.expect_feed_contains_record(f, {"application": "serega"}, True)

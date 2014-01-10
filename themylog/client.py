@@ -3,7 +3,8 @@ import logging
 import re
 import socket
 
-from themylog.config import find_config, read_config, get_receivers
+from themylog.config import find_config, read_config
+from themylog.config.receivers import get_receivers
 from themylog.level import levels
 from themylog.record import Record
 from themylog.record.serializer import serialize_json

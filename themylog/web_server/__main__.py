@@ -2,25 +2,27 @@ import logging
 from werkzeug.serving import run_simple
 from werkzeug.wrappers import Request, Response
 
-from themylog.config import find_config, read_config, create_storages, get_feeds
+from themylog.config import find_config, read_config
+from themylog.config.handlers import create_handlers
+from themylog.config.feeds import get_feeds
+from themylog.handler.interface import IRetrieveCapable
 from themylog.record.serializer import serialize_json
-from themylog.storage.interface import IRetriever
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     config = read_config(find_config())
 
-    """Create storages"""
+    """Create handlers"""
 
-    storages = create_storages(config)
+    handlers = create_handlers(config)
 
-    for storage in storages:
-        if IRetriever.providedBy(storage):
-            retriever = storage
+    for handler in handlers:
+        if IRetrieveCapable.providedBy(handler):
+            retriever = handler
             break
     else:
-        raise Exception("You should have at least one storage that implements IRetriever to use web server")
+        raise Exception("You should have at least one handler that is IRetrieveCapable to use web server")
 
     """Get feeds"""
 
@@ -38,7 +40,7 @@ if __name__ == "__main__":
 
         limit = request.args.get("limit", 50, int)
 
-        response = Response("[" + ",".join(map(serialize_json, retriever.retrieve(feed, limit))) + "]",
+        response = Response("[" + ",".join(map(serialize_json, retriever.retrieve(feed.rules_tree, limit))) + "]",
                             headers=[("Access-Control-Allow-Origin", "*")],
                             mimetype="application/json")
         return response(environ, start_response)
