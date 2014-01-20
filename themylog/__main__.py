@@ -3,9 +3,10 @@ from Queue import Queue
 from threading import Thread
 
 from themylog.config import find_config, read_config
-from themylog.config.receivers import create_receivers
-from themylog.config.handlers import create_handlers
+from themylog.config.disorders import get_disorders
 from themylog.config.feeds import get_feeds
+from themylog.config.handlers import create_handlers
+from themylog.config.receivers import create_receivers
 from themylog.feed import IFeedsAware
 
 if __name__ == "__main__":
@@ -42,6 +43,12 @@ if __name__ == "__main__":
     for handler in handlers:
         if IFeedsAware.providedBy(handler):
             handler.set_feeds(feeds)
+
+    """Init disorders"""
+
+    disorders = get_disorders(config)
+
+    disorders_states = [(None, None) for i, disorder in enumerate(disorders)]
 
     """Main loop"""
 

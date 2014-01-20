@@ -8,7 +8,7 @@ import themylog.disorder.seeker
 
 
 def get_disorders(config):
-    return {k: get_disorder(**v) for k, v in config.get("disorders", []).items()}
+    return [get_disorder(**args) for args in config.get("disorders", [])]
 
 
 def get_disorder(title, **kwargs):

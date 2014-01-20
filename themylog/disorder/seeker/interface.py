@@ -7,5 +7,5 @@ class IDisorderSeeker(zope.interface.Interface):
 
 
 class IReplayable(zope.interface.Interface):
-    def retrieve_records(self, retriever):
+    def replay(self, retriever):
         """Retrieve records to replay and restore disorder on application start"""
