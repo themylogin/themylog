@@ -24,3 +24,33 @@ class PlaintextRecordParserTestCase(unittest.TestCase):
         self.assertEqual(record.level, levels["info"])
         self.assertEqual(record.msg, "test")
         self.assertEqual(record.args, {"key1": 1, "key2": 1.1, "key3": "Test key"})
+
+    def test_args_lists(self):
+        record = self.parse("""
+            msg=test
+            list[0]=5
+            list[1]=25
+            list[2]=125
+        """)
+        self.assertEqual(record.msg, "test")
+        self.assertEqual(record.args, {"list": [5, 25, 125]})
+
+    def test_args_lists_unordered_keys(self):
+        record = self.parse("""
+            msg=test
+            list[2]=125
+            list[0]=5
+            list[1]=25
+        """)
+        self.assertEqual(record.msg, "test")
+        self.assertEqual(record.args, {"list": [5, 25, 125]})
+
+    def test_args_lists_skipped_keys(self):
+        record = self.parse("""
+            msg=test
+            list[0]=5
+            list[2]=625
+            list[6]=15625
+        """)
+        self.assertEqual(record.msg, "test")
+        self.assertEqual(record.args, {"list": [5, None, 625, None, None, None, 15625]})

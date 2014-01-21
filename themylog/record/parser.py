@@ -4,6 +4,7 @@ from datetime import datetime
 import dateutil.parser
 import json
 import logging
+import re
 
 from themylog.level import levels, parse_level, repr_level
 from themylog.record import Record
@@ -68,10 +69,23 @@ def parse_plaintext(text, default_datetime=None, default_application=None, defau
                     else:
                         for cast in (int, float):
                             try:
-                                args[key] = cast(value)
+                                value = cast(value)
                                 break
                             except ValueError:
                                 pass
+
+                        list_match = re.match("(?P<key>.+)\[(?P<index>0|[1-9][0-9]*)\]$", key)
+                        if list_match:
+                            key = list_match.group("key")
+                            index = int(list_match.group("index"))
+
+                            if key not in args:
+                                args[key] = []
+
+                            if index >= len(args[key]):
+                                args[key] += [None] * (index - len(args[key]) + 1)
+
+                            args[key][index] = value
                         else:
                             args[key] = value
 
