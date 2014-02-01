@@ -12,8 +12,9 @@ setup(
     description='Human-readable logging facility',
     long_description=open('README.md').read(),
     install_requires=[
-        "zope.interface >= 4.0.5",
+        "celery",
         "isodate",
+        "zope.interface >= 4.0.5",
     ],
     setup_requires=[
         "nose>=1.0",
