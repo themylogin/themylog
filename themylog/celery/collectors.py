@@ -1,6 +1,5 @@
 # -*- coding=utf-8 -*-
 from __future__ import absolute_import, division, unicode_literals
-
 import ast
 from celery.schedules import crontab
 from datetime import datetime
@@ -8,8 +7,9 @@ import os
 import subprocess
 import sys
 
+import themyutils.json
+
 from themylog.client import Client
-import themylog.json
 from themylog.level import levels
 from themylog.record import Record
 
@@ -44,7 +44,7 @@ def create_collector_task(client, path, name):
         if p.returncode == 0:
             stdout = stdout.strip()
             if stdout:
-                for data in map(themylog.json.loads, stdout.split("\n")):
+                for data in map(themyutils.json.loads, stdout.split("\n")):
                     records.append(Record(datetime=data["datetime"],
                                           application=name,
                                           logger=data["logger"],

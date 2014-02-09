@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, unicode_literals
 import datetime as datetime_
 import sys
 
-import themylog.json
+import themyutils.json
 
 
 class Collector(object):
@@ -12,9 +12,9 @@ class Collector(object):
         if datetime is None:
             datetime = datetime_.datetime.now()
 
-        sys.stdout.write("%s\n" % themylog.json.dumps({"datetime":     datetime,
-                                                       "logger":       logger,
-                                                       "level":        level,
-                                                       "msg":          msg,
-                                                       "args":         args,
-                                                       "explanation":  explanation,}))
+        sys.stdout.write("%s\n" % themyutils.json.dumps({"datetime":     datetime,
+                                                         "logger":       logger,
+                                                         "level":        level,
+                                                         "msg":          msg,
+                                                         "args":         args,
+                                                         "explanation":  explanation,}))

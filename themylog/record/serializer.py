@@ -1,5 +1,5 @@
-import themylog.json
+import themyutils.json
 
 
 def serialize_json(record):
-    return themylog.json.dumps(record._asdict())
+    return themyutils.json.dumps(record._asdict())
