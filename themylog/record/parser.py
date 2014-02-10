@@ -2,9 +2,10 @@ from __future__ import absolute_import
 
 from datetime import datetime
 import dateutil.parser
-import json
 import logging
 import re
+
+import themyutils.json
 
 from themylog.level import levels, parse_level, repr_level
 from themylog.record import Record
@@ -13,9 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_json(text):
-    d = json.loads(text)
-    d["datetime"] = dateutil.parser.parse(d["datetime"])
-    return Record(**d)
+    return Record(**themyutils.json.loads(text))
 
 
 def parse_plaintext(text, default_datetime=None, default_application=None, default_logger=None,
