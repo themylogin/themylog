@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-import json
 import logging
 import operator
 from Queue import Queue
@@ -13,6 +12,8 @@ from sqlalchemy.orm import create_session
 from threading import Thread
 import time
 from zope.interface import implements
+
+import themyutils.json
 
 from themylog.rules_tree.evaluator import Evaluator
 from themylog.record import Record
@@ -34,7 +35,7 @@ class SQLRecord(Base):
     datetime    = Column(DateTime())
     level       = Column(Integer())
     msg         = Column(Text())
-    args        = Column(PickleType(pickler=json))
+    args        = Column(PickleType(pickler=themyutils.json))
     explanation = Column(Text())
 
 
