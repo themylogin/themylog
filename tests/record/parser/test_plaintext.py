@@ -71,3 +71,8 @@ class PlaintextRecordParserTestCase(unittest.TestCase):
         self.assertEqual(record.msg, "test")
         self.assertEqual(record.args, {"a": "b"})
 
+    def test_bad_unicode(self):
+        record = self.parse(b"""
+            msg=test_equal_sign_in_arg_value \xb7 474aaab
+        """)
+        self.assertEqual(record.msg, u"test_equal_sign_in_arg_value \ufffd 474aaab")

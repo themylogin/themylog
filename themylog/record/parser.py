@@ -19,6 +19,7 @@ def parse_json(text):
 
 def parse_plaintext(text, default_datetime=None, default_application=None, default_logger=None,
                     default_level=levels["warning"]):
+    text = text.decode("utf-8", "replace")
     datetime_ = default_datetime or datetime.now()
     application = default_application
     logger_ = default_logger
