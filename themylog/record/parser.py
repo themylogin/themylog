@@ -61,7 +61,7 @@ def parse_plaintext(text, default_datetime=None, default_application=None, defau
 
                     elif key == "args":
                         try:
-                            args.update(json.loads(value))
+                            args.update(themyutils.json.loads(value))
                         except ValueError:
                             logger.info("Unable to parse args '%s', defaulting to %s", value, args)
 

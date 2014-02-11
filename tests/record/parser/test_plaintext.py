@@ -63,3 +63,11 @@ class PlaintextRecordParserTestCase(unittest.TestCase):
         self.assertEqual(record.msg, "test")
         self.assertEqual(record.args, {"titles": [None, "a=b"]})
 
+    def test_load_args_from_json(self):
+        record = self.parse("""
+            msg=test
+            args={"a": "b"}
+        """)
+        self.assertEqual(record.msg, "test")
+        self.assertEqual(record.args, {"a": "b"})
+
