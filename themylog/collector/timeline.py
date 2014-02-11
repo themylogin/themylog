@@ -34,4 +34,5 @@ class Timeline(Collector):
                                                    (operator.eq, lambda k: k("msg"), self.msg_template % key))), 1)) > 0
 
     def store(self, key, args, **kwargs):
+        kwargs["logger"] = self.logger
         self._log(self.msg_template % key, args, **kwargs)
