@@ -54,3 +54,12 @@ class PlaintextRecordParserTestCase(unittest.TestCase):
         """)
         self.assertEqual(record.msg, "test")
         self.assertEqual(record.args, {"list": [5, None, 625, None, None, None, 15625]})
+
+    def test_equal_sign_in_arg_value(self):
+        record = self.parse("""
+            msg=test
+            titles[1]=a=b
+        """)
+        self.assertEqual(record.msg, "test")
+        self.assertEqual(record.args, {"titles": [None, "a=b"]})
+

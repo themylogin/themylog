@@ -36,7 +36,7 @@ def parse_plaintext(text, default_datetime=None, default_application=None, defau
                 headers_read = True
             else:
                 if "=" in line:
-                    key, value = line.split("=")
+                    key, value = line.split("=", 1)
 
                     if key == "datetime":
                         try:
