@@ -8,6 +8,7 @@ from themylog.config.feeds import get_feeds
 from themylog.config.handlers import create_handlers
 from themylog.config.receivers import create_receivers
 from themylog.feed import IFeedsAware
+from themylog.web_server import setup_web_server
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
@@ -16,7 +17,7 @@ if __name__ == "__main__":
 
     record_queue = Queue()
 
-    """Create and start receivers"""
+    # Create and start receivers
 
     receivers = create_receivers(config)
 
@@ -32,11 +33,11 @@ if __name__ == "__main__":
         receiver_thread.daemon = True
         receiver_thread.start()
 
-    """Create handlers"""
+    # Create handlers
 
     handlers = create_handlers(config)
 
-    """Create feeds"""
+    # Create feeds
 
     feeds = get_feeds(config)
 
@@ -44,13 +45,18 @@ if __name__ == "__main__":
         if IFeedsAware.providedBy(handler):
             handler.set_feeds(feeds)
 
-    """Init disorders"""
+    # Init disorders
 
     disorders = get_disorders(config)
 
     disorders_states = [(None, None) for i, disorder in enumerate(disorders)]
 
-    """Main loop"""
+    # Web server
+
+    if "web_server" in config:
+        setup_web_server(config["web_server"], handlers, feeds)
+
+    # Main loop
 
     while True:
         record = record_queue.get()
