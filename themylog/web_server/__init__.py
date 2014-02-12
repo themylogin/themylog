@@ -66,7 +66,7 @@ class WebApplication(object):
                                         self.wsgi_app, handler_class=WebSocketHandler).serve_forever()
 
     def handle(self, record):
-        for queue in self.queues:
+        for queue in self.queues.copy():
             queue.put(record)
 
         if self.async:
