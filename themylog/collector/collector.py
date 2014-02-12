@@ -6,6 +6,8 @@ import sys
 
 import themyutils.json
 
+__all__ = ["Collector"]
+
 
 class Collector(object):
     def _log(self, msg, args, datetime=None, logger="root", level="info", explanation=""):

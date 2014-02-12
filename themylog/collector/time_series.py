@@ -3,6 +3,8 @@ from __future__ import absolute_import, division, unicode_literals
 
 from themylog.collector.collector import Collector
 
+__all__ = ["TimeSeries"]
+
 
 class TimeSeries(Collector):
     def __getattr__(self, attr):

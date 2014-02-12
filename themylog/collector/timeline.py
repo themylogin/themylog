@@ -9,6 +9,8 @@ from themylog.config import find_config, read_config
 from themylog.config.handlers import create_handlers
 from themylog.handler.interface import IRetrieveCapable
 
+__all__ = ["Timeline"]
+
 
 class Timeline(Collector):
     def __init__(self, logger="root", msg_template="%s"):
