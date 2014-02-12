@@ -84,41 +84,13 @@ class WebApplication(object):
 
     def execute_feed(self, request, name=None):
         if name in self.feeds:
-            feed = self.feeds[name]
-        else:
-            feed = None
-
-        if feed:
-            rules_tree = feed.rules_tree
+            rules_tree = self.feeds[name].rules_tree
         else:
             rules_tree = None
 
         limit = request.args.get("limit", 50, int)
 
-        if "wsgi.websocket" in request.environ:
-            queue = Queue()
-            self.queues.add(queue)
-
-            try:
-                ws = request.environ["wsgi.websocket"]
-
-                records = self.retriever.retrieve(rules_tree, limit)
-
-                for record in reversed(records):
-                    ws.send(serialize_json(record))
-
-                while True:
-                    self.gevent.get_hub().wait(self.async)
-
-                    while not queue.empty():
-                        record = queue.get()
-                        if feed is None or feed.contains(record):
-                            ws.send(serialize_json(record))
-            finally:
-                self.queues.remove(queue)
-        else:
-            records = self.retriever.retrieve(rules_tree, limit)
-            return Response("[" + ",".join(map(serialize_json, records)) + "]", mimetype="application/json")
+        return self.serve_records(request, rules_tree, limit)
 
     def execute_timeline(self, request, application, logger=None):
         rules_tree = (operator.eq, lambda k: k("application"), application)
@@ -128,30 +100,10 @@ class WebApplication(object):
 
         limit = request.args.get("limit", 1, int)
 
-        if "wsgi.websocket" in request.environ:
-            queue = Queue()
-            self.queues.add(queue)
-
-            try:
-                ws = request.environ["wsgi.websocket"]
-
-                records = self.retriever.retrieve(rules_tree, limit)
-
-                for record in reversed(records):
-                    ws.send(themyutils.json.dumps(record.args))
-
-                while True:
-                    self.gevent.get_hub().wait(self.async)
-
-                    while not queue.empty():
-                        record = queue.get()
-                        if match_record(rules_tree, record):
-                            ws.send(themyutils.json.dumps(records.args))
-            finally:
-                self.queues.remove(queue)
-        else:
-            records = self.retriever.retrieve(rules_tree, limit)
-            return Response(themyutils.json.dumps([record.args for record in records]), mimetype="application/json")
+        return self.serve_records(request, rules_tree, limit,
+                                  serialize_one=lambda record: themyutils.json.dumps(record.args),
+                                  serialize_collection=lambda records: themyutils.json.dumps([record.args
+                                                                                              for record in records]))
 
     def execute_timeseries(self, request, application, logger=None, msg=None):
         rules_tree = (operator.eq, lambda k: k("application"), application)
@@ -162,6 +114,14 @@ class WebApplication(object):
         if msg is not None:
             rules_tree = (operator.and_, rules_tree, (operator.eq, lambda k: k("msg"), msg))
 
+        return self.serve_records(request, rules_tree, 1,
+                                  serialize_one=lambda record: themyutils.json.dumps(record.args),
+                                  serialize_collection=lambda records: themyutils.json.dumps(records[0].args if records
+                                                                                             else None))
+
+    def serve_records(self, request, rules_tree, limit,
+                      serialize_one=serialize_json,
+                      serialize_collection=lambda records: "[" + ",".join(map(serialize_json, records)) + "]"):
         if "wsgi.websocket" in request.environ:
             queue = Queue()
             self.queues.add(queue)
@@ -169,20 +129,20 @@ class WebApplication(object):
             try:
                 ws = request.environ["wsgi.websocket"]
 
-                records = self.retriever.retrieve(rules_tree, 1)
+                records = self.retriever.retrieve(rules_tree, limit)
 
-                if records:
-                    ws.send(themyutils.json.dumps(records[0].args))
+                for record in reversed(records):
+                    ws.send(serialize_one(record))
 
                 while True:
                     self.gevent.get_hub().wait(self.async)
 
                     while not queue.empty():
                         record = queue.get()
-                        if match_record(rules_tree, record):
-                            ws.send(themyutils.json.dumps(records.args))
+                        if rules_tree is None or match_record(rules_tree, record):
+                            ws.send(serialize_one(record))
             finally:
                 self.queues.remove(queue)
         else:
-            records = self.retriever.retrieve(rules_tree, 1)
-            return Response(themyutils.json.dumps(records[0].args if records else None), mimetype="application/json")
+            records = self.retriever.retrieve(rules_tree, limit)
+            return Response(serialize_collection(records), mimetype="application/json")
