@@ -1,9 +1,15 @@
+from __future__ import absolute_import
+
+from celery import Celery
 import logging
 from Queue import Queue
 from threading import Thread
 
-from themylog.celery import celery
+from themylog.cleanup import setup_cleanup
+from themylog.collector import setup_collectors
 from themylog.config import find_config, read_config
+from themylog.config.cleanup import get_cleanups
+from themylog.config.collectors import get_collectors
 from themylog.config.disorders import get_disorders
 from themylog.config.feeds import get_feeds
 from themylog.config.handlers import create_handlers
@@ -46,13 +52,22 @@ if __name__ == "__main__":
         if IFeedsAware.providedBy(handler):
             handler.set_feeds(feeds)
 
-    # Init disorders
+    # Create scheduler
 
-    disorders = get_disorders(config)
+    celery = Celery()
+    celery.config_from_object(config["celery"])
 
-    disorders_states = [(None, None) for i, disorder in enumerate(disorders)]
+    # Set up cleanups
 
-    # Scheduler
+    cleanups = get_cleanups(config)
+    setup_cleanup(celery, cleanups, handlers)
+
+    # Set up collectors
+
+    collectors = get_collectors(config)
+    setup_collectors(celery, collectors)
+
+    # Start scheduler
 
     celery_beat_thread = Thread(target=celery.Beat().run)
     celery_beat_thread.daemon = True

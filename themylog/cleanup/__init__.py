@@ -4,15 +4,11 @@ from __future__ import absolute_import, division, unicode_literals
 from celery.schedules import crontab
 from datetime import datetime
 
-from themylog.config.handlers import create_handlers
-from themylog.config.cleanup import get_cleanups
 from themylog.handler.interface import ICleanupCapable
 
 
-def setup_cleanup(celery, config):
-    cleanups = get_cleanups(config)
+def setup_cleanup(celery, cleanups, handlers):
     if cleanups:
-        handlers = create_handlers(config)
         handlers = filter(lambda handler: ICleanupCapable.providedBy(handler), handlers)
         if not handlers:
             raise Exception("You don't have any handlers that are ICleanupCapable")
