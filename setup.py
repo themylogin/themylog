@@ -14,6 +14,7 @@ setup(
     install_requires=[
         "celery",
         "isodate",
+        "threadpool",
         "zope.interface >= 4.0.5",
     ],
     setup_requires=[

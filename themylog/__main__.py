@@ -2,6 +2,7 @@ import logging
 from Queue import Queue
 from threading import Thread
 
+from themylog.celery import celery
 from themylog.config import find_config, read_config
 from themylog.config.disorders import get_disorders
 from themylog.config.feeds import get_feeds
@@ -50,6 +51,16 @@ if __name__ == "__main__":
     disorders = get_disorders(config)
 
     disorders_states = [(None, None) for i, disorder in enumerate(disorders)]
+
+    # Scheduler
+
+    celery_beat_thread = Thread(target=celery.Beat().run)
+    celery_beat_thread.daemon = True
+    celery_beat_thread.start()
+
+    celery_worker_thread = Thread(target=celery.WorkController(pool_cls="threads").start)
+    celery_worker_thread.daemon = True
+    celery_worker_thread.start()
 
     # Web server
 
