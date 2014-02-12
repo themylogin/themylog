@@ -51,8 +51,6 @@ class WebApplication(object):
         ])
 
         self.gevent = None
-        self.async = None
-
         self.queues = set()
 
     def serve_forever(self):
@@ -60,17 +58,13 @@ class WebApplication(object):
         from geventwebsocket.handler import WebSocketHandler
 
         self.gevent = gevent
-        self.async = gevent.get_hub().loop.async()
-
         return gevent.pywsgi.WSGIServer((self.configuration["host"], self.configuration["port"]),
                                         self.wsgi_app, handler_class=WebSocketHandler).serve_forever()
 
     def handle(self, record):
-        for queue in self.queues.copy():
+        for queue, async in self.queues.copy():
             queue.put(record)
-
-        if self.async:
-            self.async.send()
+            async.send()
 
     def wsgi_app(self, environ, start_response):
         request = Request(environ)
@@ -124,7 +118,8 @@ class WebApplication(object):
                       serialize_collection=lambda records: "[" + ",".join(map(serialize_json, records)) + "]"):
         if "wsgi.websocket" in request.environ:
             queue = Queue()
-            self.queues.add(queue)
+            async = self.gevent.get_hub().loop.async()
+            self.queues.add((queue, async))
 
             try:
                 ws = request.environ["wsgi.websocket"]
@@ -135,14 +130,14 @@ class WebApplication(object):
                     ws.send(serialize_one(record))
 
                 while True:
-                    self.gevent.get_hub().wait(self.async)
+                    self.gevent.get_hub().wait(async)
 
                     while not queue.empty():
                         record = queue.get()
                         if rules_tree is None or match_record(rules_tree, record):
                             ws.send(serialize_one(record))
             finally:
-                self.queues.remove(queue)
+                self.queues.remove((queue, async))
         else:
             records = self.retriever.retrieve(rules_tree, limit)
             return Response(serialize_collection(records), mimetype="application/json")
