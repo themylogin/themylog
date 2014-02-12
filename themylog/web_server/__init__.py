@@ -1,11 +1,14 @@
 # -*- coding=utf-8 -*-
 from __future__ import absolute_import, division, unicode_literals
 
+import operator
 from Queue import Queue
 from threading import Thread
 from werkzeug.wrappers import Request, Response
 from werkzeug.routing import Map, Rule
 from zope.interface import implements
+
+import themyutils.json
 
 from themylog.handler.interface import IHandler, IRetrieveCapable
 from themylog.record.serializer import serialize_json
@@ -39,6 +42,9 @@ class WebApplication(object):
         self.url_map = Map([
             Rule("/", endpoint="feed"),
             Rule("/feed/<name>", endpoint="feed"),
+            Rule("/timeseries/<application>", endpoint="timeseries"),
+            Rule("/timeseries/<application>/<logger>", endpoint="timeseries"),
+            Rule("/timeseries/<application>/<logger>/<msg>", endpoint="timeseries"),
         ])
 
         self.gevent = None
@@ -110,3 +116,41 @@ class WebApplication(object):
         else:
             records = self.retriever.retrieve(rules_tree, limit)
             return Response("[" + ",".join(map(serialize_json, records)) + "]", mimetype="application/json")
+
+    def execute_timeseries(self, request, application, logger=None, msg=None):
+        if logger is None and msg is None:
+            logger = "root"
+            msg = application
+        elif msg is None:
+            msg = logger
+
+        rules_tree = (operator.and_,
+                         (operator.eq, lambda k: k("application"), application),
+                         (operator.and_,
+                             (operator.eq, lambda k: k("logger"), logger),
+                             (operator.eq, lambda k: k("msg"), msg)))
+
+        if "wsgi.websocket" in request.environ:
+            queue = Queue()
+            self.queues.add(queue)
+
+            try:
+                ws = request.environ["wsgi.websocket"]
+
+                records = self.retriever.retrieve(rules_tree, 1)
+
+                if records:
+                    ws.send(themyutils.json.dumps(records[0].args))
+
+                while True:
+                    self.gevent.get_hub().wait(self.async)
+
+                    while not queue.empty():
+                        record = queue.get()
+                        if [record.application, record.logger, record.msg] == [application, logger, msg]:
+                            ws.send(themyutils.json.dumps(records.args))
+            finally:
+                self.queues.remove(queue)
+        else:
+            records = self.retriever.retrieve(rules_tree, 1)
+            return Response(themyutils.json.dumps(records[0].args if records else None), mimetype="application/json")
