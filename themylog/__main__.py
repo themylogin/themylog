@@ -69,11 +69,13 @@ if __name__ == "__main__":
 
     # Start scheduler
 
-    celery_beat_thread = Thread(target=celery.Beat().run)
+    celery_beat = celery.Beat()
+    celery_beat.set_process_title = lambda: None
+    celery_beat_thread = Thread(target=celery_beat.run)
     celery_beat_thread.daemon = True
     celery_beat_thread.start()
 
-    celery_worker_thread = Thread(target=celery.WorkController(pool_cls="threads").start)
+    celery_worker_thread = Thread(target=celery.WorkController(pool_cls="solo").start)
     celery_worker_thread.daemon = True
     celery_worker_thread.start()
 
