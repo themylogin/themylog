@@ -51,13 +51,16 @@ class WebApplication(object):
         ])
 
         self.gevent = None
+        self.WebSocketError = None
         self.queues = set()
 
     def serve_forever(self):
         import gevent
+        from geventwebsocket import WebSocketError
         from geventwebsocket.handler import WebSocketHandler
 
         self.gevent = gevent
+        self.WebSocketError = WebSocketError
         return gevent.pywsgi.WSGIServer((self.configuration["host"], self.configuration["port"]),
                                         self.wsgi_app, handler_class=WebSocketHandler).serve_forever()
 
@@ -121,9 +124,9 @@ class WebApplication(object):
             async = self.gevent.get_hub().loop.async()
             self.queues.add((queue, async))
 
-            try:
-                ws = request.environ["wsgi.websocket"]
+            ws = request.environ["wsgi.websocket"]
 
+            try:
                 records = self.retriever.retrieve(rules_tree, limit)
 
                 for record in reversed(records):
@@ -136,8 +139,15 @@ class WebApplication(object):
                         record = queue.get()
                         if rules_tree is None or match_record(rules_tree, record):
                             ws.send(serialize_one(record))
+            except self.WebSocketError:
+                pass
             finally:
                 self.queues.remove((queue, async))
+
+                if not ws.closed:
+                    ws.close()
+
+            return Response()
         else:
             records = self.retriever.retrieve(rules_tree, limit)
             return Response(serialize_collection(records), mimetype="application/json")
