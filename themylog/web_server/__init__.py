@@ -4,12 +4,14 @@ from __future__ import absolute_import, division, unicode_literals
 import operator
 from Queue import Queue
 from threading import Thread
-from werkzeug.wrappers import Request, Response
+from werkzeug.exceptions import HTTPException
 from werkzeug.routing import Map, Rule
+from werkzeug.wrappers import Request, Response
 from zope.interface import implements
 
 import themyutils.json
 
+from themylog.disorder.manager import IDisorderManagerObserver
 from themylog.handler.interface import IHandler, IRetrieveCapable
 from themylog.record.serializer import serialize_json
 from themylog.rules_tree import match_record
@@ -31,9 +33,11 @@ def setup_web_server(configuration, handlers, feeds):
 
     handlers.append(web_application)
 
+    return web_application
+
 
 class WebApplication(object):
-    implements(IHandler)
+    implements(IHandler, IDisorderManagerObserver)
 
     def __init__(self, configuration, retriever, feeds):
         self.configuration = configuration
@@ -48,11 +52,15 @@ class WebApplication(object):
             Rule("/timeseries/<application>", endpoint="timeseries"),
             Rule("/timeseries/<application>/<logger>", endpoint="timeseries"),
             Rule("/timeseries/<application>/<logger>/<msg>", endpoint="timeseries"),
+            Rule("/disorders", endpoint="disorders"),
         ])
 
         self.gevent = None
         self.WebSocketError = None
         self.queues = set()
+
+        self.disorders = {}
+        self.disorder_queues = set()
 
     def serve_forever(self):
         import gevent
@@ -69,9 +77,18 @@ class WebApplication(object):
             queue.put(record)
             async.send()
 
+    def update_disorders(self, disorders):
+        self.disorders = disorders
+        for queue, async in self.disorder_queues.copy():
+            queue.put(disorders)
+            async.send()
+
     def wsgi_app(self, environ, start_response):
         request = Request(environ)
-        response = self.dispatch_request(request)
+        try:
+            response = self.dispatch_request(request)
+        except HTTPException as e:
+            response = e
         response.headers.add(b"Access-Control-Allow-Origin", "*")
         return response(environ, start_response)
 
@@ -151,3 +168,31 @@ class WebApplication(object):
         else:
             records = self.retriever.retrieve(rules_tree, limit)
             return Response(serialize_collection(records), mimetype="application/json")
+
+    def execute_disorders(self, request):
+        if "wsgi.websocket" in request.environ:
+            queue = Queue()
+            async = self.gevent.get_hub().loop.async()
+            self.disorder_queues.add((queue, async))
+
+            ws = request.environ["wsgi.websocket"]
+
+            try:
+                ws.send(themyutils.json.dumps(self.disorders))
+
+                while True:
+                    self.gevent.get_hub().wait(async)
+
+                    while not queue.empty():
+                        ws.send(queue.get())
+            except self.WebSocketError:
+                pass
+            finally:
+                self.disorder_queues.remove((queue, async))
+
+                if not ws.closed:
+                    ws.close()
+
+            return Response()
+        else:
+            return Response(themyutils.json.dumps(self.disorders), mimetype="application/json")

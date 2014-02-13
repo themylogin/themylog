@@ -42,9 +42,17 @@ def create_collector_task(client, path, name):
                                           msg=data["msg"],
                                           args=data["args"],
                                           explanation=data["explanation"]))
+
+            records.append(Record(datetime=datetime.now(),
+                                  application="%s.collector" % name,
+                                  logger="root",
+                                  level=levels["info"],
+                                  msg="completed_successfully",
+                                  args={},
+                                  explanation=""))
         else:
             records.append(Record(datetime=datetime.now(),
-                                  application=name,
+                                  application="%s.collector" % name,
                                   logger="root",
                                   level=levels["error"],
                                   msg="nonzero_exit_code",

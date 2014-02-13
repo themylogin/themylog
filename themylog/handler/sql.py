@@ -72,11 +72,12 @@ class SQL(object):
     def handle(self, record):
         self.query_queue.put(SQLRecord.__table__.insert().values(**record._asdict()))
 
-    def retrieve(self, rules_tree, limit):
-        return [Record(**{k: getattr(record, k) for k in Record._fields})
-                for record in self._create_query(rules_tree).\
-                              order_by(SQLRecord.id.desc())
-                              [:limit]]
+    def retrieve(self, rules_tree, limit=None):
+        records = self._create_query(rules_tree).order_by(SQLRecord.id.desc())
+        if limit is not None:
+            records = records[:limit]
+
+        return map(lambda record: Record(**{k: getattr(record, k) for k in Record._fields}), records)
 
     def cleanup(self, rules_tree, older_than):
         self._create_query(rules_tree).filter(SQLRecord.datetime < older_than).delete()

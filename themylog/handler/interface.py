@@ -7,7 +7,7 @@ class IHandler(zope.interface.Interface):
 
 
 class IRetrieveCapable(zope.interface.Interface):
-    def retrieve(self, rules_tree, limit):
+    def retrieve(self, rules_tree, limit=None):
         """Retrieve records matching conditions from the handler"""
 
 

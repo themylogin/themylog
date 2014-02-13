@@ -4,17 +4,17 @@ class AbstractDisorderSeeker(object):
         disorder_seeker.observers = []
         return disorder_seeker
 
-    def add_observer(self, observer):
-        self.observers.append(observer)
+    def add_observer(self, observer, key):
+        self.observers.append((observer, key))
 
-    def there_is_disorder(self, record):
-        for observer in self.observers:
-            observer.there_is_disorder(record)
+    def there_is_disorder(self, reason):
+        for observer, key in self.observers:
+            observer.there_is_disorder(key, reason)
 
-    def there_is_no_disorder(self, record):
-        for observer in self.observers:
-            observer.there_is_no_disorder(record)
+    def there_is_no_disorder(self, reason):
+        for observer, key in self.observers:
+            observer.there_is_no_disorder(key, reason)
 
     def seeker_is_not_functional(self):
-        for observer in self.observers:
-            observer.seeker_is_not_functional()
+        for observer, key in self.observers:
+            observer.seeker_is_not_functional(key)

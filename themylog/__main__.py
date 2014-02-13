@@ -14,6 +14,8 @@ from themylog.config.disorders import get_disorders
 from themylog.config.feeds import get_feeds
 from themylog.config.handlers import create_handlers
 from themylog.config.receivers import create_receivers
+from themylog.disorder.collector import setup_collector_disorders
+from themylog.disorder.script import setup_script_disorders
 from themylog.feed import IFeedsAware
 from themylog.web_server import setup_web_server
 
@@ -52,6 +54,12 @@ if __name__ == "__main__":
         if IFeedsAware.providedBy(handler):
             handler.set_feeds(feeds)
 
+    # Web server
+
+    web_server = None
+    if "web_server" in config:
+        web_server = setup_web_server(config["web_server"], handlers, feeds)
+
     # Create scheduler
 
     celery = Celery()
@@ -67,6 +75,15 @@ if __name__ == "__main__":
     collectors = get_collectors(config)
     setup_collectors(celery, collectors)
 
+    # Set up disorders
+
+    disorder_manager, script_disorders = get_disorders(config, handlers)
+    setup_collector_disorders(disorder_manager, collectors)
+    setup_script_disorders(disorder_manager, celery, script_disorders)
+
+    if web_server:
+        disorder_manager.add_observer(web_server)
+
     # Start scheduler
 
     celery_beat = celery.Beat()
@@ -78,11 +95,6 @@ if __name__ == "__main__":
     celery_worker_thread = Thread(target=celery.WorkController(pool_cls="solo").start)
     celery_worker_thread.daemon = True
     celery_worker_thread.start()
-
-    # Web server
-
-    if "web_server" in config:
-        setup_web_server(config["web_server"], handlers, feeds)
 
     # Main loop
 

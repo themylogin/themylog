@@ -8,10 +8,10 @@ from themylog.disorder.seeker.abstract import AbstractDisorderSeeker
 from themylog.disorder.seeker.interface import IDisorderSeeker, IReplayable
 from themylog.rules_tree import match_record
 
-__all__ = ["DisorderSeeker"]
+__all__ = ["RecordBasedSeeker"]
 
 
-class DisorderSeeker(AbstractDisorderSeeker):
+class RecordBasedSeeker(AbstractDisorderSeeker):
     implements(IDisorderSeeker, IReplayable)
 
     def __init__(self, right, wrong, period=None):
@@ -31,7 +31,7 @@ class DisorderSeeker(AbstractDisorderSeeker):
         else:
             if self.period is not None:
                 if self.last_seeker_record_received_at is None or\
-                                        datetime.now() - self.period > self.last_seeker_record_received_at:
+                        datetime.now() - self.period > self.last_seeker_record_received_at:
                     self.seeker_is_not_functional()
 
     def replay(self, retriever):

@@ -9,7 +9,7 @@ import unittest
 from themylog.annotations.schedule import schedule
 
 
-class CreateScheduleTestCase(unittest.TestCase):
+class ScheduleTestCase(unittest.TestCase):
     @replace("themylog.annotations.schedule.crontab", Mock())
     def test_creates_schedule(self, crontab):
         schedule(ast.parse("crontab(hour=7, minute='*/15')"))

@@ -18,7 +18,7 @@ def read_annotations(code, annotation_parsers):
 
         for key, parser in annotation_parsers.items():
             annotation = parser(tree)
-            if tree:
+            if annotation:
                 annotations[key] = annotation
                 break
 

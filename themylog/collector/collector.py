@@ -14,9 +14,9 @@ class Collector(object):
         if datetime is None:
             datetime = datetime_.datetime.now()
 
-        sys.stdout.write("%s\n" % themyutils.json.dumps({"datetime":     datetime,
-                                                         "logger":       logger,
-                                                         "level":        level,
-                                                         "msg":          msg,
-                                                         "args":         args,
-                                                         "explanation":  explanation,}))
+        sys.stdout.write(b"%s\n" % themyutils.json.dumps({"datetime":     datetime,
+                                                          "logger":       logger,
+                                                          "level":        level,
+                                                          "msg":          msg,
+                                                          "args":         args,
+                                                          "explanation":  explanation,}))

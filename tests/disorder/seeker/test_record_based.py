@@ -6,7 +6,7 @@ import textwrap
 import unittest
 import yaml
 
-from themylog.config.disorders import get_disorder
+from themylog.config.disorders import get_record_based_disorder_seeker
 from themylog.level import levels
 
 
@@ -15,9 +15,9 @@ class DisorderSeekerAbstractTestCase(unittest.TestCase):
         self.observer = Mock()
 
     def create_seeker_from_yaml(self, disorder_yaml):
-        disorder = get_disorder(**yaml.load(textwrap.dedent(disorder_yaml)))
-        disorder.seeker.add_observer(self.observer)
-        return disorder.seeker
+        seeker = get_record_based_disorder_seeker(**yaml.load(textwrap.dedent(disorder_yaml)))
+        seeker.add_observer(self.observer, "ethernet")
+        return seeker
 
     def fake_record(self, **kwargs):
         record = Mock()
@@ -95,7 +95,7 @@ class ReceiveRecordTestCase(DisorderSeekerAbstractTestCase):
         seeker = self.create_seeker_from_yaml(self.ethernet_yaml)
         with Replacer() as r:
             d = datetime(2013, 1, 1, 0, 0, 0)
-            r.replace("themylog.disorder.seeker.disorder_seeker.datetime", d)
+            r.replace("themylog.disorder.seeker.record_based.datetime", d)
             seeker.receive_record(self.fake_record(datetime=d,
                                                    application="smarthome",
                                                    logger="bathroom_door",
@@ -103,7 +103,7 @@ class ReceiveRecordTestCase(DisorderSeekerAbstractTestCase):
                                                    msg="opened"))
 
             d = datetime(2013, 1, 1, 0, 0, 1)
-            r.replace("themylog.disorder.seeker.disorder_seeker.datetime", d)
+            r.replace("themylog.disorder.seeker.record_based.datetime", d)
             seeker.receive_record(self.fake_record(datetime=d,
                                                    application="ethernet_links",
                                                    logger="server",
@@ -112,7 +112,7 @@ class ReceiveRecordTestCase(DisorderSeekerAbstractTestCase):
             self.assertEqual(self.observer.method_calls[-1][0], "there_is_no_disorder")
 
             d = datetime(2013, 1, 1, 1, 30, 0)
-            r.replace("themylog.disorder.seeker.disorder_seeker.datetime", d)
+            r.replace("themylog.disorder.seeker.record_based.datetime", d)
             seeker.receive_record(self.fake_record(datetime=d,
                                                    application="smarthome",
                                                    logger="bathroom_door",
