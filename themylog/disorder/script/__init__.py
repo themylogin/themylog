@@ -34,14 +34,14 @@ class Disorder(object):
                                                           "explanation": explanation,}))
 
 
-def setup_script_disorders(disorder_manager, celery, script_disorders):
+def setup_script_disorder_seekers(disorder_manager, celery, script_disorders):
     for script in script_disorders:
         disorder_manager.add(script.annotations["title"],
                              create_script_disorder_seeker(script.name))
 
         client = Client()
 
-        script_task = celery.task(create_script_disorder_task(client, script.path, script.name),
+        script_task = celery.task(create_script_disorder_seeker_task(client, script.path, script.name),
                                   name="script_disorders.%s" % script.name)
 
         celery.conf.CELERYBEAT_SCHEDULE[script_task.name] = {
@@ -51,26 +51,16 @@ def setup_script_disorders(disorder_manager, celery, script_disorders):
 
 
 class ScriptSeeker(RecordBasedSeeker):
-    def there_is_disorder(self, record):
-        return super(RecordBasedSeeker, self).there_is_disorder({"datetime": record.datetime,
-                                                                 "reason": self.reason(record)})
-
-    def there_is_no_disorder(self, record):
+    def disorder_reason(self, record):
         if record.msg == "disorder_checker_returned_nonzero_exit_code":
-            reason = "Скрипт вернул код %d:\n%s\n%s" % (record.args["code"], record.args["stdout"],
+            return "Скрипт вернул код %d:\n%s\n%s" % (record.args["code"], record.args["stdout"],
                                                         record.args["stderr"])
         elif record.msg == "disorder_checker_returned_nothing":
-            reason = "Скрипт не вернул ничего"
+            return "Скрипт не вернул ничего"
         else:
-            reason = self.reason(record)
-
-        return super(RecordBasedSeeker, self).there_is_no_disorder({"datetime": record.datetime,
-                                                                    "reason": reason})
-
-    def reason(self, record):
-        return [(potential_disorder["ok"], "%s: %s" % (potential_disorder["key"], potential_disorder["explanation"]))
-                for potential_disorder in record.args]
-
+            return [("%s: %s" % (potential_disorder["key"], potential_disorder["explanation"]),
+                     potential_disorder["ok"])
+                    for potential_disorder in record.args]
 
 
 def create_script_disorder_seeker(name):
@@ -88,7 +78,7 @@ def create_script_disorder_seeker(name):
     )
 
 
-def create_script_disorder_task(client, path, name):
+def create_script_disorder_seeker_task(client, path, name):
     def script_disorder_task():
         p = subprocess.Popen([sys.executable, path, name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()

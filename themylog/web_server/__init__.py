@@ -87,9 +87,9 @@ class WebApplication(object):
         request = Request(environ)
         try:
             response = self.dispatch_request(request)
+            response.headers.add(b"Access-Control-Allow-Origin", "*")
         except HTTPException as e:
             response = e
-        response.headers.add(b"Access-Control-Allow-Origin", "*")
         return response(environ, start_response)
 
     def dispatch_request(self, request):
@@ -178,7 +178,7 @@ class WebApplication(object):
             ws = request.environ["wsgi.websocket"]
 
             try:
-                ws.send(themyutils.json.dumps(self.disorders))
+                ws.send(self.serialize_disorders(self.disorders))
 
                 while True:
                     self.gevent.get_hub().wait(async)
@@ -195,4 +195,8 @@ class WebApplication(object):
 
             return Response()
         else:
-            return Response(themyutils.json.dumps(self.disorders), mimetype="application/json")
+            return Response(self.serialize_disorders(self.disorders), mimetype="application/json")
+
+    def serialize_disorders(self, disorders):
+        return themyutils.json.dumps([(title, has_disorder, disorder._asdict())
+                                      for title, (has_disorder, disorder) in disorders.iteritems()])

@@ -14,8 +14,8 @@ from themylog.config.disorders import get_disorders
 from themylog.config.feeds import get_feeds
 from themylog.config.handlers import create_handlers
 from themylog.config.receivers import create_receivers
-from themylog.disorder.collector import setup_collector_disorders
-from themylog.disorder.script import setup_script_disorders
+from themylog.disorder.collector import setup_collector_disorder_seekers
+from themylog.disorder.script import setup_script_disorder_seekers
 from themylog.feed import IFeedsAware
 from themylog.web_server import setup_web_server
 
@@ -77,9 +77,9 @@ if __name__ == "__main__":
 
     # Set up disorders
 
-    disorder_manager, script_disorders = get_disorders(config, handlers)
-    setup_collector_disorders(disorder_manager, collectors)
-    setup_script_disorders(disorder_manager, celery, script_disorders)
+    disorder_manager, script_disorder_seekers = get_disorders(config, handlers)
+    setup_collector_disorder_seekers(disorder_manager, collectors)
+    setup_script_disorder_seekers(disorder_manager, celery, script_disorder_seekers)
 
     if web_server:
         disorder_manager.add_observer(web_server)

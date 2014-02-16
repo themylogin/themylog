@@ -73,7 +73,7 @@ class SQL(object):
         self.query_queue.put(SQLRecord.__table__.insert().values(**record._asdict()))
 
     def retrieve(self, rules_tree, limit=None):
-        records = self._create_query(rules_tree).order_by(SQLRecord.id.desc())
+        records = self._create_query(rules_tree).order_by(SQLRecord.datetime.desc())
         if limit is not None:
             records = records[:limit]
 

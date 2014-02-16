@@ -5,12 +5,13 @@ from datetime import datetime, timedelta
 import operator
 from zope.interface import implements
 
+from themylog.disorder import Disorder
 from themylog.disorder.seeker.abstract import AbstractDisorderSeeker
 from themylog.disorder.seeker.interface import IDisorderSeeker, IReplayable
 from themylog.level import levels
 
 
-def setup_collector_disorders(disorder_manager, collectors):
+def setup_collector_disorder_seekers(disorder_manager, collectors):
     for collector in collectors:
         disorder_manager.add(collector.annotations.get("title", "Обновление %s" % collector.name),
                              CollectorDisorderSeeker(collector))
@@ -25,9 +26,9 @@ class CollectorDisorderSeeker(AbstractDisorderSeeker):
     def receive_record(self, record):
         if record.application == "%s.collector" % self.collector.name:
             if record.level < levels["warning"]:
-                self.there_is_no_disorder({"datetime": record.datetime})
+                self.there_is_no_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
             else:
-                self.there_is_disorder({"datetime": record.datetime})
+                self.there_is_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
 
     def replay(self, retriever):
         records = retriever.retrieve((operator.and_,
@@ -36,9 +37,9 @@ class CollectorDisorderSeeker(AbstractDisorderSeeker):
         if records:
             for record in records:
                 if record.level < levels["warning"]:
-                    self.there_is_no_disorder({"datetime": record.datetime})
+                    self.there_is_no_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
                     break
             else:
-                self.there_is_disorder({"datetime": records[0].datetime})
+                self.there_is_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
         else:
             self.seeker_is_not_functional()

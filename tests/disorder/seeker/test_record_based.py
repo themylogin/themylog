@@ -26,7 +26,6 @@ class DisorderSeekerAbstractTestCase(unittest.TestCase):
         return record
 
     ethernet_yaml = """
-        title: "Ethernet link is gigabit"
         right: [{application: ethernet_links, logger: server, msg: detected_gigabit_link, action: accept}]
         wrong: [{application: ethernet_links, logger: server, level: ">= warning", action: accept}]
         period: PT1H5M

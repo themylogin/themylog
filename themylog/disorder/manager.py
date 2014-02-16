@@ -34,11 +34,11 @@ class DisorderManager(object):
         if self.retriever and IReplayable.providedBy(seeker):
             seeker.replay(self.retriever)
 
-    def there_is_disorder(self, key, reason):
-        self.set_disorder_value(key, (False, reason))
+    def there_is_disorder(self, key, disorder):
+        self.set_disorder_value(key, (False, disorder))
 
-    def there_is_no_disorder(self, key, reason):
-        self.set_disorder_value(key, (True, reason))
+    def there_is_no_disorder(self, key, disorder):
+        self.set_disorder_value(key, (True, disorder))
 
     def seeker_is_not_functional(self, key):
         self.set_disorder_value(key, None)
