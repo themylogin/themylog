@@ -13,10 +13,12 @@ from themylog.config.collectors import get_collectors
 from themylog.config.disorders import get_disorders
 from themylog.config.feeds import get_feeds
 from themylog.config.handlers import create_handlers
+from themylog.config.processors import get_processors
 from themylog.config.receivers import create_receivers
 from themylog.disorder.collector import setup_collector_disorder_seekers
 from themylog.disorder.script import setup_script_disorder_seekers
 from themylog.feed import IFeedsAware
+from themylog.processor import run_processor
 from themylog.web_server import setup_web_server
 
 if __name__ == "__main__":
@@ -84,6 +86,9 @@ if __name__ == "__main__":
     if web_server:
         disorder_manager.add_observer(web_server)
 
+    # Set up processors
+    processors = get_processors(config)
+
     # Start scheduler
 
     celery_beat = celery.Beat()
@@ -100,5 +105,10 @@ if __name__ == "__main__":
 
     while True:
         record = record_queue.get()
+
         for handler in handlers:
             handler.handle(record)
+
+        for processor in processors:
+            for result in run_processor(processor, record):
+                record_queue.put(result)
