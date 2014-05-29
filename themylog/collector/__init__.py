@@ -4,6 +4,7 @@ from __future__ import absolute_import, division, unicode_literals
 from datetime import datetime
 import subprocess
 import sys
+from threading import Thread
 
 import themyutils.json
 
@@ -16,8 +17,7 @@ def setup_collectors(celery, collectors):
     for collector in collectors:
         client = Client()
 
-        collector_task = celery.task(create_collector_task(client, collector.path, collector.name),
-                                     name="collectors.%s" % collector.name)
+        collector_task = celery.task(create_collector_task(collector, client), name="collectors.%s" % collector.name)
 
         celery.conf.CELERYBEAT_SCHEDULE[collector_task.name] = {
             "task":     collector_task.name,
@@ -25,42 +25,62 @@ def setup_collectors(celery, collectors):
         }
 
 
-def create_collector_task(client, path, name):
+def create_collector_task(collector, client):
     def collector_task():
-        p = subprocess.Popen([sys.executable, path, name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = p.communicate()
-
         records = []
-        if p.returncode == 0:
-            stdout = stdout.strip()
-            if stdout:
-                for data in map(themyutils.json.loads, stdout.split("\n")):
-                    records.append(Record(datetime=data["datetime"],
-                                          application=name,
-                                          logger=data["logger"],
-                                          level=levels[data["level"]],
-                                          msg=data["msg"],
-                                          args=data["args"],
-                                          explanation=data["explanation"]))
 
-            records.append(Record(datetime=datetime.now(),
-                                  application="%s.collector" % name,
-                                  logger="root",
-                                  level=levels["info"],
-                                  msg="completed_successfully",
-                                  args={},
-                                  explanation=""))
+        p = subprocess.Popen([sys.executable, collector.path, collector.name],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout_stderr = []
+
+        def target():
+            stdout_stderr[:] = p.communicate()
+
+        thread = Thread(target=target)
+        thread.start()
+
+        thread.join(collector.annotations.get("timeout", 60))
+        if not thread.is_alive():
+            if p.returncode == 0:
+                stdout = stdout_stderr[0].strip()
+                if stdout:
+                    for data in map(themyutils.json.loads, stdout.split("\n")):
+                        records.append(Record(datetime=data["datetime"],
+                                              application=collector.name,
+                                              logger=data["logger"],
+                                              level=levels[data["level"]],
+                                              msg=data["msg"],
+                                              args=data["args"],
+                                              explanation=data["explanation"]))
+
+                records.append(Record(datetime=datetime.now(),
+                                      application="%s.collector" % collector.name,
+                                      logger="root",
+                                      level=levels["info"],
+                                      msg="completed_successfully",
+                                      args={},
+                                      explanation=""))
+            else:
+                records.append(Record(datetime=datetime.now(),
+                                      application="%s.collector" % collector.name,
+                                      logger="root",
+                                      level=levels["error"],
+                                      msg="nonzero_exit_code",
+                                      args={
+                                          "code": p.returncode,
+                                          "stdout": stdout_stderr[0],
+                                          "stderr": stdout_stderr[1],
+                                      },
+                                      explanation=""))
         else:
+            p.terminate()
+            thread.join()
             records.append(Record(datetime=datetime.now(),
-                                  application="%s.collector" % name,
+                                  application="%s.collector" % collector.name,
                                   logger="root",
                                   level=levels["error"],
-                                  msg="nonzero_exit_code",
-                                  args={
-                                      "code": p.returncode,
-                                      "stdout": stdout,
-                                      "stderr": stderr,
-                                  },
+                                  msg="timeout",
+                                  args={},
                                   explanation=""))
 
         for record in records:

@@ -4,6 +4,10 @@ from __future__ import absolute_import, division, unicode_literals
 import ast
 
 
+class NoneValue(object):
+    pass
+
+
 def read_annotations(code, annotation_parsers):
     annotations = {}
 
@@ -19,6 +23,8 @@ def read_annotations(code, annotation_parsers):
         for key, parser in annotation_parsers.items():
             annotation = parser(tree)
             if annotation:
+                if annotation == NoneValue:
+                    annotation = None
                 annotations[key] = annotation
                 break
 
