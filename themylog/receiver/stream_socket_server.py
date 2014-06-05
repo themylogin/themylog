@@ -10,7 +10,7 @@ from zope.interface import implements
 from themylog.receiver.interface import IReceiver
 from themylog.record.parser import parse_json, parse_plaintext
 
-__all__ = ["TCPServer"]
+__all__ = ["TCPServer", "UDPServer"]
 if hasattr(SocketServer, "UnixStreamServer"):
     __all__.extend(["UnixServer"])
 
@@ -21,13 +21,17 @@ class StreamSocketServerHandler(SocketServer.BaseRequestHandler):
         if isinstance(address, tuple):
             address = address[0]
 
-        recv = ""
-        while True:
-            data = self.request.recv(1024)
-            if not data:
-                break
+        request = self.request
+        if isinstance(request, tuple):
+            recv = request[0]
+        else:
+            recv = ""
+            while True:
+                data = request.recv(1024)
+                if not data:
+                    break
 
-            recv += data
+                recv += data
 
         self.server.queue.put((address, recv))
 
@@ -65,6 +69,11 @@ class StreamSocketServer(object):
 class TCPServer(StreamSocketServer):
     def __init__(self, host, port, format="json"):
         super(TCPServer, self).__init__(format, SocketServer.ThreadingTCPServer, (host, port))
+
+
+class UDPServer(StreamSocketServer):
+    def __init__(self, host, port, format="json"):
+        super(UDPServer, self).__init__(format, SocketServer.ThreadingUDPServer, (host, port))
 
 
 if hasattr(SocketServer, "ThreadingUnixStreamServer"):
