@@ -184,7 +184,7 @@ class WebApplication(object):
                     self.gevent.get_hub().wait(async)
 
                     while not queue.empty():
-                        ws.send(queue.get())
+                        ws.send(self.serialize_disorders(queue.get()))
             except self.WebSocketError:
                 pass
             finally:
