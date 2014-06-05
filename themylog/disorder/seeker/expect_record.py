@@ -1,7 +1,7 @@
-from __future__ import absolute_import
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
 
 from datetime import datetime
-import operator
 from zope.interface import implements
 
 from themylog.disorder import Disorder
@@ -23,13 +23,11 @@ class ExpectRecordSeeker(AbstractDisorderSeeker):
         if match_record(self.condition, record) and record.datetime >= datetime.now() - self.interval:
             self.there_is_no_disorder(Disorder(record.datetime, None, {"record": record}))
         else:
-            self.there_is_disorder(Disorder(datetime.now(), None, {}))
+            self.there_is_disorder(Disorder(datetime.now(),
+                                            "Последняя запись %s" % record.datetime.strftime("%d.%m в %H:%M"),
+                                            {}))
 
     def replay(self, retriever):
-        records = retriever.retrieve((operator.and_,
-                                         self.condition,
-                                         (operator.ge, lambda k: k("datetime"), datetime.now() - self.interval)), 1)
+        records = retriever.retrieve(self.condition, 1)
         if records:
-            self.there_is_no_disorder(Disorder(records[0].datetime, None, {"record": records[0]}))
-        else:
-            self.there_is_disorder(Disorder(datetime.now(), None, {}))
+            self.receive_record(records[0])
