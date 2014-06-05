@@ -22,14 +22,15 @@ class ExpectRecordSeeker(AbstractDisorderSeeker):
     def receive_record(self, record):
         if match_record(self.condition, record):
             if record.datetime >= datetime.now() - self.interval:
-                self.there_is_no_disorder(Disorder(record.datetime, None, {"record": record}))
+                self.there_is_no_disorder(Disorder(record.datetime, self._disorder_reason(record), {"record": record}))
             else:
-                self.there_is_disorder(Disorder(datetime.now(),
-                                                "Последняя запись %s в %s" % (record.datetime.strftime("%d.%m"),
-                                                                              record.datetime.strftime("%H:%M")),
-                                                {}))
+                self.there_is_disorder(Disorder(datetime.now(), self._disorder_reason(record), {"record": record}))
 
     def replay(self, retriever):
         records = retriever.retrieve(self.condition, 1)
         if records:
             self.receive_record(records[0])
+
+    def _disorder_reason(self, record):
+        return "Последняя запись %s в %s" % (record.datetime.strftime("%d.%m"),
+                                             record.datetime.strftime("%H:%M"))
