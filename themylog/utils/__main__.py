@@ -31,7 +31,7 @@ if __name__ == "__main__":
             if processor.name == sys.argv[2]:
                 condition = True
                 for k, v in itertools.izip_longest(*([iter(sys.argv[3:])] * 2)):
-                    condition = (operator.and_, condition, (operator.eq, lambda _: _(k), v))
+                    condition = (lambda k, v: (operator.and_, condition, (operator.eq, lambda _: _(k), v)))(k, v)
 
                 client = Client()
                 for record in reversed(retriever.retrieve(condition)):
