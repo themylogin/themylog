@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, unicode_literals
 
 from datetime import datetime
+import traceback
 
 from themylog.level import levels
 from themylog.record import Record
@@ -10,14 +11,15 @@ from themylog.record import Record
 def run_processor(processor, record):
     try:
         result = processor.process(record)
-    except Exception as e:
+    except Exception:
         return [Record(application=processor.name,
                        logger="root",
                        datetime=datetime.now(),
                        level=levels["error"],
                        msg="exception",
                        args={
-                           "repr": repr(e)
+                           "record":    record._asdict(),
+                           "traceback": traceback.format_exc(),
                        },
                        explanation="")]
 
