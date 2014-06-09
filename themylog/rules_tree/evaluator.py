@@ -1,8 +1,8 @@
 class Evaluator(object):
-    def __init__(self, get_record_key, constant_map={}, operator_map={}):
+    def __init__(self, get_record_key, constant_map=None, operator_map=None):
         self.get_record_key = get_record_key
-        self.constant_map = constant_map
-        self.operator_map = operator_map
+        self.constant_map = constant_map or {}
+        self.operator_map = operator_map or {}
 
     def eval(self, tree):
         operator = tree[0]
