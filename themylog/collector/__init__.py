@@ -83,7 +83,7 @@ def create_collector_task(collector, client):
                                   args={},
                                   explanation=""))
 
-        for record in records:
+        for record in sorted(records, key=lambda record: record.datetime):
             client.log(record)
 
     return collector_task
