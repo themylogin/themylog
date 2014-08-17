@@ -23,23 +23,30 @@ class CollectorDisorderSeeker(AbstractDisorderSeeker):
     def __init__(self, collector):
         self.collector = collector
 
+        self.allowed_downtime = self.collector.annotations.get("allowed_downtime", timedelta(hours=1))
+        self.last_success = None
+
     def receive_record(self, record):
         if record.application == "%s.collector" % self.collector.name:
-            if record.level < levels["warning"]:
-                self.there_is_no_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
-            else:
-                self.there_is_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
+            self._handle_record(record)
 
     def replay(self, retriever):
         records = retriever.retrieve((operator.and_,
                                          (operator.eq, lambda k: k("application"), "%s.collector" % self.collector.name),
-                                         (operator.ge, lambda k: k("datetime"), datetime.now() - timedelta(hours=2))))
+                                         (operator.ge, lambda k: k("datetime"), datetime.now() - timedelta(hours=24))))
         if records:
-            for record in records:
-                if record.level < levels["warning"]:
-                    self.there_is_no_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
-                    break
-            else:
-                self.there_is_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
+            if not any(self._handle_record(record) for record in records):
+                self.there_is_disorder(Disorder(records[0].datetime, None, {"record": records[0]._asdict()}))
         else:
             self.seeker_is_not_functional()
+
+    def _handle_record(self, record):
+        if record.level >= levels["warning"]:
+            if self.allowed_downtime is None or datetime.now() - record.datetime > self.allowed_downtime:
+                self.there_is_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
+                return True
+        else:
+            self.there_is_no_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
+            return True
+
+        return False

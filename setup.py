@@ -18,6 +18,7 @@ setup(
         "zope.interface >= 4.0.5",
     ],
     setup_requires=[
+        "mock",
         "nose>=1.0",
         "testfixtures"
     ],

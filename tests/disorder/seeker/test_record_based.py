@@ -1,29 +1,24 @@
+# -*- coding=utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
+
 from datetime import datetime
 from mock import MagicMock, Mock
 import operator
 from testfixtures import Replacer
 import textwrap
-import unittest
 import yaml
 
 from themylog.config.disorders import get_record_based_disorder_seeker
 from themylog.level import levels
 
+from ..seeker import DisorderSeekerAbstractTestCase
 
-class DisorderSeekerAbstractTestCase(unittest.TestCase):
-    def setUp(self):
-        self.observer = Mock()
 
+class RecordBasedDisorderSeekerAbstractTestCase(DisorderSeekerAbstractTestCase):
     def create_seeker_from_yaml(self, disorder_yaml):
         seeker = get_record_based_disorder_seeker(**yaml.load(textwrap.dedent(disorder_yaml)))
         seeker.add_observer(self.observer, "ethernet")
         return seeker
-
-    def fake_record(self, **kwargs):
-        record = Mock()
-        for k, v in kwargs.items():
-            setattr(record, k, v)
-        return record
 
     ethernet_yaml = """
         right: [{application: ethernet_links, logger: server, msg: detected_gigabit_link, action: accept}]
@@ -32,7 +27,7 @@ class DisorderSeekerAbstractTestCase(unittest.TestCase):
     """
 
 
-class ReceiveRecordTestCase(DisorderSeekerAbstractTestCase):
+class ReceiveRecordTestCase(RecordBasedDisorderSeekerAbstractTestCase):
     def test_regular_life(self):
         seeker = self.create_seeker_from_yaml(self.ethernet_yaml)
         seeker.receive_record(self.fake_record(datetime=datetime.now(),
@@ -120,7 +115,7 @@ class ReceiveRecordTestCase(DisorderSeekerAbstractTestCase):
             self.assertEqual(self.observer.method_calls[-1][0], "seeker_is_not_functional")
 
 
-class ReplayTestCase(DisorderSeekerAbstractTestCase):
+class ReplayTestCase(RecordBasedDisorderSeekerAbstractTestCase):
     def test_generated_condition(self):
         retriever = Mock()
         retriever.retrieve = MagicMock(return_value=[])
