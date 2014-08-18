@@ -60,10 +60,28 @@ msg=message
 key=value
 list[0]=5
 list[2]=625
-dict={"a": "b"}
+Message with value!
 ```
+У этой записи будет application с IP-адресом отправителя (при использовании [TCPServer](#receiver-tcp)/[UDPServer](#receiver-udp)), соответствующими значениями `level` и `msg`, `args`, равным `{"key": "value", "list": [5, null, 625]}` и описанием `Message with value!`
 
 * <a name="receiver-tcp"></a>**TCPServer**
+* <a name="receiver-tcp"></a>**UDPServer**
+
+Как очевидно из названия, эти приёмники принимают TCP-соединения / UDP-дейтаграммы с сообщениями:
+
+```
+receivers:
+    - TCPServer:
+        host:   192.168.0.1
+        port:   46404
+        format: text
+
+    - UDPServer:
+        host:   192.168.0.1
+        port:   46404
+        format: text
+```
+
 * <a name="receiver-unix"></a>**UnixServer**
 
 Обработчик (handler)<a name="handler"></a>
