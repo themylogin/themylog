@@ -9,6 +9,30 @@ class PlaintextRecordParserTestCase(unittest.TestCase):
     def parse(self, text):
         return parse_plaintext(textwrap.dedent(text).strip())
 
+    def test_explanation(self):
+        record = self.parse("""
+            application=test
+            Message!
+            key=value
+        """)
+        self.assertEqual(record.application, "test")
+        self.assertEqual(record.explanation, "Message!\nkey=value")
+
+    def test_explanation_newlines(self):
+        record = self.parse("""
+            application=test
+
+            Message!
+
+        """)
+        self.assertEqual(record.explanation, "Message!")
+
+    def test_only_explanation(self):
+        record = self.parse("""
+            Message!
+        """)
+        self.assertEqual(record.explanation, "Message!")
+
     def test_unknown_keys_to_args(self):
         record = self.parse("""
             application=test_application
