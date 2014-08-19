@@ -34,7 +34,7 @@ class SQLRecord(Base):
     logger      = Column(String(length=255))
     datetime    = Column(DateTime())
     level       = Column(Integer())
-    msg         = Column(Text())
+    msg         = Column(String(length=255))
     args        = Column(PickleType(pickler=themyutils.json))
     explanation = Column(Text())
 
