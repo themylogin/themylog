@@ -49,6 +49,39 @@ themylog
 ```
 Для актуального (и большего) количества примеров можно почитать [unit-тесты соответствующего модуля](https://github.com/themylogin/themylog/blob/master/tests/config/test_feeds.py).
 
+Лента<a name="feed"></a>
+-----
+
+Ленты предназначены для группировки записей. Они описываются в секции `feeds` конфигурационного файла. Каждая лента идентифицируется уникальным именем и содержит правила, принимающие записи для попадания в ленту. Пример конфигурации:
+
+```
+feeds:
+    sms:
+        -
+            application: sms
+            action: accept
+        -
+            action: reject
+
+    problems:
+        -
+            msg: nonzero_exit_code
+            action: reject
+        -
+            msg: timeout
+            action: reject
+        -
+            msg: disorder_found
+            action: reject
+        -
+            level: ">= warning"
+            action: accept
+        -
+            action: reject
+```
+
+Для лент создаются `exchange` в [AMQP](#handler-amqp), а их содержимое доступно по адресам `http://<themylog-web-server>/feed/<feed name>?limit=<limit>` (по умолчанию 50) и `ws://<themylog-web-server>/feed/<feed name>` [веб-сервера](#web-server).
+
 Приёмник (receiver)<a name="receiver"></a>
 -------------------
 
@@ -84,14 +117,193 @@ Message with value!
 
   Очень просто послать сюда сообщение, например, из bash-скрипта:
 
-  ```
+  ```bash
   echo -e "application=kindle\nlogger=watchdog.browser\nlevel=warning\nmsg=restarting_browser\n\nПерезапуск Chromium для Kindle" | nc 192.168.0.1 46404
   ```
 
 * <a name="receiver-unix"></a>**UnixServer**
 
+  Более производительный, нежели сетевые сокеты, приёмник. Для работы `themylog.client.LoggingHandler` необходим приёмник UnixServer с форматом **json**:
+  
+  ```
+  receivers:
+      - UnixServer:
+        path:   /run/themylog/themylog.sock
+  ```
+
 Обработчик (handler)<a name="handler"></a>
 --------------------
 
-* <a name="handler-sql"></a>**SQL**
+Обработчики записей обрабатывают принятые записи. Обработчики описываются в секции `handlers` конфигурационного файла.
+
 * <a name="handler-amqp"></a>**AMQP**
+
+  Этот обработчик создаёт для каждой [ленты](#feed) `exchange` типа `topic` с именем `<exchange>.<feed>` в [RabbitMQ](http://www.rabbitmq.com/) (а так же просто `exchange`, куда попадают все записи) и рассылает в них записи с `routing_key`, состоящим из `application`.`logger`.`msg`, обрезанным под длину в 128 символов:
+  
+  ```
+  handlers:
+      - AMQP:
+          exchange:   themylog
+  ```
+  
+  Теперь на эти записи можно подписываться:
+  
+  ```python
+  import pika
+  import themyutils.json
+  
+  mq_connection = pika.BlockingConnection(pika.ConnectionParameters(host="localhost"))
+  mq_channel = mq_connection.channel()
+
+  mq_channel.exchange_declare(exchange="themylog", type="topic")
+
+  result = mq_channel.queue_declare(exclusive=True)
+  queue_name = result.method.queue
+
+  mq_channel.queue_bind(exchange="themylog", queue=queue_name, routing_key="smarthome.sleep_tracker.sleep_tracked")
+  mq_channel.basic_consume(lambda ch, method, properties, body: HANDLE(themyutils.json.loads(body)["args"]),
+                           queue=queue_name, no_ack=True)
+
+  mq_channel.start_consuming()
+  ```
+
+* <a name="handler-sql"></a>**SQL**
+
+  Этот обработчик сохраняет все принимаемые записи в таблицу базы данных. Таблица создаётся автоматически. За возможными значениями ``dsn`` обратитесь к [соответствующему разделу документации SQLAlchemy](http://docs.sqlalchemy.org/en/rel_0_9/core/engines.html#database-urls).
+  
+  ```
+  handlers:
+      - SQL:
+          dsn:    mysql://root@localhost/themylog?charset=utf8
+  ```
+
+Беспорядок (disorder)<a name="disorder"></a>
+---------------------
+
+**themylog** позволяет детектировать различные неполадки в системе. JSON неполадок (как выявленных, так и не выявленных) доступен по адресу `http://<themylog-web-server>/disorders` и через WebSocket. Например:
+
+```json
+[
+  [
+    "Резервное копирование",
+    [
+      true,
+      {
+        datetime: "datetime(2014-08-19T12:08:29.227862)",
+        reason: "Последняя запись 19.08 в 12:08",
+        data: ...
+      }
+    ]
+  ],
+  [
+    "Камеры",
+    [
+      false,
+      {
+        datetime: "datetime(2014-08-20T02:00:04.189521)",
+        reason: [
+          [
+            "Камера в подъезде: Рработает",
+            true
+          ],
+          [
+            "Камера в отсечке: Не работает",
+            false
+          ]
+        ],
+        data: ...
+      }
+    ]
+  ]
+]
+```
+
+Это список беспорядков в формате ``true`` — всё работает, ``false`` — обнаружен беспорядок. ``datetime`` — дата обнаружения беспорядка/подтверждения его отсутствия, ``reason`` — человекочитаемое обоснование наличия/отсутствии беспорядка (может состоять из нескольких пунктов), ``data`` — технические детали (аналог ``args`` для записей).
+
+Обнаруживаются беспорядки при помощи искателей (seeker), описываемых в секции ``disorders`` конфигурационного файла. В **themylog** встроены несколько шаблонов искателей:
+
+* <a name="disorder-seeker-expect_record"></a>**expect_record**
+  
+  Этот искатель обнаруживает беспорядок тогда, когда в течение указанного периода (задаваемого в формате [ISO8601 Duration](http://en.wikipedia.org/wiki/Iso8601#Durations)) не обнаруживает указанную запись. Например:
+
+  ```
+  disorders:
+      seekers:
+          -
+              class: expect_record
+              title: "Резервное копирование"
+              condition:
+                  -
+                      application: backup
+                      logger: root
+                      msg: finish
+                      action: accept
+              interval: P1DT6H
+  ```
+
+  Будет создан беспорядок, если за последние 30 часов не было успешно выполнено ни одной резервной копии.
+  
+* <a name="disorder-seeker-script"></a>**Скрипты**
+
+  **themylog** позволяет также создавать вам собственные искатели беспорядков, которые будут запускаться по расписанию. Будут запущены все файлы с расширением `.py` из указанной директории:
+  
+  ```
+  disorders:
+      directory:  /home/themylogin/www/apps/themylog_disorder_seekers
+  ```
+  
+  Поддерживаются [аннотации](#annotation) ``crontab`` и ``title``. Искатель импортирует создаёт экземпляры класса ``Disorder(title)`` из пакета ``themylog.disorder.script`` и вызывает у них методы ``ok``/``fail``/``exception`` в случае, если беспорядок не обнаружен/обнаружен/не удалось провести процедуру обнаружения. Пример такого скрипта, проверяющего, что на всех компьютерах в сети Ethernet-линки — гигабитные:
+  
+  ```python
+  # -*- coding: utf-8 -*-
+  # crontab(minute="*/30")
+  # title = "Ethernet-линки"
+  from __future__ import unicode_literals
+  
+  import paramiko
+  import subprocess
+  
+  from themylog.disorder.script import Disorder
+  
+  
+  def check_gigabit(disorder, ethtool_output):
+      if "\tSpeed: 1000Mb/s" in ethtool_output:
+          disorder.ok("Линк 1000Mb/s")
+      elif "\tSpeed: 100Mb/s" in ethtool_output:
+          disorder.fail("Линк 100Mb/s")
+      elif "\tSpeed: 10Mb/s" in ethtool_output:
+          disorder.fail("Линк 10Mb/s")
+      else:
+          disorder.fail("Не удалось разобрать вывод ethtool", ethtool_output=ethtool_output)
+  
+  
+  if __name__ == "__main__":
+      disorder = Disorder("Сервер")
+      try:
+          server_output = subprocess.check_output(["sudo", "ethtool", "eth0"])
+      except:
+          disorder.exception("Не удалось запустить ethtool")
+      else:
+          check_gigabit(disorder, server_output)
+  
+      for host, disorder_name, interface in [("192.168.0.3", "Десктоп", "p2p1"),
+                                             ("192.168.0.4", "Медиацентр", "eth0")]:
+          disorder = Disorder(disorder_name)
+  
+          try:
+              connection = paramiko.SSHClient()
+              connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+              connection.connect(host, username="themylogin")
+          except:
+              disorder.exception("Не удалось подключиться к серверу")
+          else:
+              try:
+                  stdin, stdout, stderr = connection.exec_command("sudo ethtool %s" % interface)
+                  output = "".join(stdout.readlines())
+              except:
+                  disorder.exception("Не удалось запустить ethtool")
+              else:
+                  check_gigabit(disorder, output)
+  ```
+
+  
