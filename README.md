@@ -62,25 +62,31 @@ list[0]=5
 list[2]=625
 Message with value!
 ```
-У этой записи будет application с IP-адресом отправителя (при использовании [TCPServer](#receiver-tcp)/[UDPServer](#receiver-udp)), соответствующими значениями `level` и `msg`, `args`, равным `{"key": "value", "list": [5, null, 625]}` и описанием `Message with value!`
+У этой записи будет application с IP-адресом отправителя (при использовании [TCPServer](#receiver-tcp)/[UDPServer](#receiver-udp)), соответствующими значениями `level` и `msg`, `args`, равным `{"key": "value", "list": [5, null, 625]}` и описанием `Message with value!` 
+Для актуального (и большего) количества примеров можно почитать [unit-тесты парсера текстовых записей](https://github.com/themylogin/themylog/blob/master/tests/record/parser/test_plaintext.py).
 
-* <a name="receiver-tcp"></a>**TCPServer**
-* <a name="receiver-tcp"></a>**UDPServer**
+* <a name="receiver-tcp"></a>**TCPServer**, <a name="receiver-tcp"></a>**UDPServer**
 
-Как очевидно из названия, эти приёмники принимают TCP-соединения / UDP-дейтаграммы с сообщениями:
+  Как очевидно из названия, эти приёмники принимают TCP-соединения / UDP-дейтаграммы с сообщениями:
 
-```
-receivers:
-    - TCPServer:
-        host:   192.168.0.1
-        port:   46404
-        format: text
+  ```
+  receivers:
+      - TCPServer:
+          host:   192.168.0.1
+          port:   46404
+          format: text
 
-    - UDPServer:
-        host:   192.168.0.1
-        port:   46404
-        format: text
-```
+      - UDPServer:
+          host:   192.168.0.1
+          port:   46404
+          format: text
+  ```
+
+  Очень просто послать сюда сообщение, например, из bash-скрипта:
+
+  ```
+  echo -e "application=kindle\nlogger=watchdog.browser\nlevel=warning\nmsg=restarting_browser\n\nПерезапуск Chromium для Kindle" | nc 192.168.0.1 46404
+  ```
 
 * <a name="receiver-unix"></a>**UnixServer**
 
