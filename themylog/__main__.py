@@ -87,6 +87,7 @@ if __name__ == "__main__":
         disorder_manager.add_observer(web_server)
 
     # Set up processors
+
     processors = get_processors(config)
 
     # Start scheduler

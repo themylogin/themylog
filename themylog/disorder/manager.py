@@ -1,11 +1,13 @@
 # -*- coding=utf-8 -*-
 from __future__ import absolute_import, division, unicode_literals
 
-from collections import OrderedDict
+from collections import namedtuple, OrderedDict
 from zope.interface import Interface, implements
 
 from themylog.disorder.seeker.interface import IReplayable
 from themylog.handler.interface import IHandler, IRetrieveCapable
+
+MaybeDisorder = namedtuple("MaybeDisorder", ["is_disorder", "disorder"])
 
 
 class DisorderManager(object):
@@ -35,10 +37,10 @@ class DisorderManager(object):
             seeker.replay(self.retriever)
 
     def there_is_disorder(self, key, disorder):
-        self.set_disorder_value(key, (False, disorder))
+        self.set_disorder_value(key, MaybeDisorder(True, disorder))
 
     def there_is_no_disorder(self, key, disorder):
-        self.set_disorder_value(key, (True, disorder))
+        self.set_disorder_value(key, MaybeDisorder(False, disorder))
 
     def seeker_is_not_functional(self, key):
         self.set_disorder_value(key, None)

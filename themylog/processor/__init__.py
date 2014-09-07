@@ -18,7 +18,7 @@ def run_processor(processor, record):
                        level=levels["error"],
                        msg="exception",
                        args={
-                           "record":    record._asdict(),
+                           "record":    record,
                            "traceback": traceback.format_exc(),
                        },
                        explanation="")]

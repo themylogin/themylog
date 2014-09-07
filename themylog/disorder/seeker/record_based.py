@@ -25,11 +25,11 @@ class RecordBasedSeeker(AbstractDisorderSeeker):
     def receive_record(self, record):
         if match_record(self.right, record):
             self.there_is_no_disorder(Disorder(record.datetime, self.disorder_reason(record),
-                                               {"record": record._asdict()}))
+                                               {"record": record}))
             self.last_seeker_record_received_at = record.datetime
         elif match_record(self.wrong, record):
             self.there_is_disorder(Disorder(record.datetime, self.disorder_reason(record),
-                                            {"record": record._asdict()}))
+                                            {"record": record}))
             self.last_seeker_record_received_at = record.datetime
         else:
             if self.period is not None:

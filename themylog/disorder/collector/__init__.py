@@ -36,17 +36,17 @@ class CollectorDisorderSeeker(AbstractDisorderSeeker):
                                          (operator.ge, lambda k: k("datetime"), datetime.now() - timedelta(hours=24))))
         if records:
             if not any(self._handle_record(record) for record in records):
-                self.there_is_disorder(Disorder(records[0].datetime, None, {"record": records[0]._asdict()}))
+                self.there_is_disorder(Disorder(records[0].datetime, None, {"record": records[0]}))
         else:
             self.seeker_is_not_functional()
 
     def _handle_record(self, record):
         if record.level >= levels["warning"]:
             if self.allowed_downtime is None or datetime.now() - record.datetime > self.allowed_downtime:
-                self.there_is_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
+                self.there_is_disorder(Disorder(record.datetime, None, {"record": record}))
                 return True
         else:
-            self.there_is_no_disorder(Disorder(record.datetime, None, {"record": record._asdict()}))
+            self.there_is_no_disorder(Disorder(record.datetime, None, {"record": record}))
             return True
 
         return False

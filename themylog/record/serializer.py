@@ -2,4 +2,4 @@ import themyutils.json
 
 
 def serialize_json(record):
-    return themyutils.json.dumps(record._asdict())
+    return themyutils.json.dumps(record)
