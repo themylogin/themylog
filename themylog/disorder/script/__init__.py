@@ -58,8 +58,8 @@ class ScriptSeeker(RecordBasedSeeker):
         elif record.msg == "disorder_checker_returned_nothing":
             return "Скрипт не вернул ничего"
         else:
-            return [("%s: %s" % (potential_disorder["key"], potential_disorder["explanation"]),
-                     potential_disorder["ok"])
+            return [{"is_disorder": not potential_disorder["ok"],
+                     "disorder": "%s: %s" % (potential_disorder["key"], potential_disorder["explanation"])}
                     for potential_disorder in record.args]
 
 
