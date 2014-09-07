@@ -198,8 +198,7 @@ Message with value!
     "is_disorder": true,
     "disorder": {
       datetime: "datetime(2014-08-20T02:00:04.189521)",
-      reason: "Последняя запись 19.08 в 12:08",
-      data: [
+      reason: [
         [
           {
             "is_disorder": false,
@@ -210,7 +209,8 @@ Message with value!
             "disorder": "Камера в отсечке: Не работает"
           }
         ]
-    ],
+      ],
+      data: ...
     },
   }
 ]
