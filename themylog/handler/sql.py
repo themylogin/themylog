@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, unicode_literals
 
+from itertools import combinations
 import logging
 import operator
 from Queue import Queue
 from sqlalchemy import create_engine
-from sqlalchemy import Column
+from sqlalchemy import Column, Index
 from sqlalchemy import BigInteger, DateTime, Integer, PickleType, String, Text
 from sqlalchemy import literal
 from sqlalchemy.ext.declarative import declarative_base
@@ -38,6 +39,15 @@ class SQLRecord(Base):
     msg         = Column(String(length=255), nullable=False)
     args        = Column(PickleType(pickler=themyutils.json), nullable=False)
     explanation = Column(Text(), nullable=False)
+
+    __table_args__ = tuple(
+        Index("_".join(index), *index)
+        for index in set(
+            sum(sum([[[combination, combination + ("datetime",)] if "datetime" not in combination else [combination]
+                      for combination in combinations(["application", "logger", "datetime", "level", "msg"], r + 1)]
+                     for r in range(5)], []), [])
+        )
+    )
 
 
 class SQL(object):
