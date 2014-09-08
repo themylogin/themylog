@@ -1,4 +1,5 @@
-from __future__ import absolute_import
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
 
 import logging
 import operator
@@ -19,7 +20,7 @@ from themylog.rules_tree.evaluator import Evaluator
 from themylog.record import Record
 from themylog.handler.interface import IHandler, IRetrieveCapable, ICleanupCapable
 
-__all__ = ["SQL"]
+__all__ = [b"SQL"]
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +31,13 @@ class SQLRecord(Base):
     __tablename__ = "log"
 
     id          = Column(BigInteger, primary_key=True)
-    application = Column(String(length=255))
-    logger      = Column(String(length=255))
-    datetime    = Column(DateTime())
-    level       = Column(Integer())
-    msg         = Column(String(length=255))
-    args        = Column(PickleType(pickler=themyutils.json))
-    explanation = Column(Text())
+    application = Column(String(length=255), nullable=False)
+    logger      = Column(String(length=255), nullable=False)
+    datetime    = Column(DateTime(), nullable=False)
+    level       = Column(Integer(), nullable=False)
+    msg         = Column(String(length=255), nullable=False)
+    args        = Column(PickleType(pickler=themyutils.json), nullable=False)
+    explanation = Column(Text(), nullable=False)
 
 
 class SQL(object):
@@ -50,7 +51,7 @@ class SQL(object):
         self.rules_tree_evaluator = Evaluator(
             lambda key: getattr(SQLRecord, key),
             constant_map={
-                # Constant expressions such as (operator.not_, True) are evalauted in-place; however, as operator.not_
+                # Constant expressions such as (operator.not_, True) are evaluated in-place; however, as operator.not_
                 # is substituted with operator.inv_, (operator.inv_, True) is -2. This is not what being expected.
                 True: literal(True),
                 False: literal(False),
