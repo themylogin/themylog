@@ -32,5 +32,8 @@ class ExpectRecordSeeker(AbstractDisorderSeeker):
             self.receive_record(records[0])
 
     def _disorder_reason(self, record):
-        return "Последняя запись %s в %s" % (record.datetime.strftime("%d.%m"),
-                                             record.datetime.strftime("%H:%M"))
+        reason = "Последняя запись %s в %s" % (record.datetime.strftime("%d.%m"),
+                                               record.datetime.strftime("%H:%M"))
+        if record.explanation != "":
+            reason += ": «%s»" % record.explanation
+        return reason

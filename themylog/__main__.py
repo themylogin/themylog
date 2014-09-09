@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from celery import Celery
+from celery.app.defaults import DEFAULT_PROCESS_LOG_FMT
 import logging
 from Queue import Queue
 from threading import Thread
@@ -22,13 +23,14 @@ from themylog.processor import run_processor
 from themylog.web_server import setup_web_server
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG, format=DEFAULT_PROCESS_LOG_FMT)
+    logger = logging.getLogger(__name__)
 
     config = read_config(find_config())
 
     record_queue = Queue()
 
-    # Create and start receivers
+    logging.info("Creating receivers")
 
     receivers = create_receivers(config)
 
@@ -44,11 +46,11 @@ if __name__ == "__main__":
         receiver_thread.daemon = True
         receiver_thread.start()
 
-    # Create handlers
+    logging.info("Creating handlers")
 
     handlers = create_handlers(config)
 
-    # Create feeds
+    logging.info("Creating feeds")
 
     feeds = get_feeds(config)
 
@@ -56,28 +58,28 @@ if __name__ == "__main__":
         if IFeedsAware.providedBy(handler):
             handler.set_feeds(feeds)
 
-    # Web server
+    logging.info("Setting up web server")
 
     web_server = None
     if "web_server" in config:
         web_server = setup_web_server(config["web_server"], handlers, feeds)
 
-    # Create scheduler
+    logging.info("Creating scheduler")
 
     celery = Celery()
     celery.config_from_object(config["celery"])
 
-    # Set up cleanups
+    logging.info("Setting up cleanups")
 
     cleanups = get_cleanups(config)
     setup_cleanup(celery, cleanups, handlers)
 
-    # Set up collectors
+    logging.info("Setting up collectors")
 
     collectors = get_collectors(config)
     setup_collectors(celery, collectors)
 
-    # Set up disorders
+    logging.info("Setting up disorders")
 
     disorder_manager, script_disorder_seekers = get_disorders(config, handlers)
     setup_collector_disorder_seekers(disorder_manager, collectors)
@@ -86,11 +88,11 @@ if __name__ == "__main__":
     if web_server:
         disorder_manager.add_observer(web_server)
 
-    # Set up processors
+    logging.info("Setting up processors")
 
     processors = get_processors(config)
 
-    # Start scheduler
+    logging.info("Starting scheduler")
 
     celery_beat = celery.Beat()
     celery_beat.set_process_title = lambda: None
@@ -102,7 +104,7 @@ if __name__ == "__main__":
     celery_worker_thread.daemon = True
     celery_worker_thread.start()
 
-    # Main loop
+    logging.info("Running")
 
     while True:
         record = record_queue.get()
