@@ -408,3 +408,119 @@ collectors:
   ts = TimeSeries()
   ts.weather(...)
   ```
+
+Процессор (processor)<a name="processor"></a>
+---------------------
+
+``themylog`` позволяет обрабатывать входящие записи, порождая новые. Например, демон забирает SMS-сообщения с USB-модема и кладёт их в ``themylog``, а процессор `alfa-bank` вытаскивает из них данные о транзакциях по банковской карте, которые тоже сохраняются в ``themylog``. Каждый процессор — это ``*.py``-файл из указанной директории, содержащий функцию ``process(record)``:
+
+```
+processors:
+    directory:  /home/themylogin/www/apps/themylog_processors
+```
+
+Пример процессора:
+
+```python
+# -*- coding=utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
+
+from themylog.level import levels
+from themylog.record import Record
+
+
+def process(record):
+    if record.application == "sms" and record.logger == "Alfa-Bank":
+        args = None
+        if record.explanation.count("; ") >= 3:
+            args = {...}
+        else:
+            raise Exception("Bad message")
+
+        if args is not None:
+            return Record(application="alfa-bank",
+                          logger="root",
+                          datetime=record.datetime,
+                          level=levels["info"],
+                          msg=record.msg,
+                          args=args,
+                          explanation="")
+```
+
+Для того, чтобы запустить вновь написанный процессор для уже существующих записей, выполните следующую команду:
+
+```
+python -m themylog.utils run_processor alfa-bank
+```
+
+Если у вас много записей и вы заранее знаете, что большинство из них процессор проигнорирует, для ускорения работы можно ограничить обрабатываемую выборку:
+
+```
+python -m themylog.utils run_processor backup application backup logger root msg finish
+```
+
+Процессор будет запущен только для записей с `application` = `backup`, `logger` = `root`, `msg` = `finish`.
+
+Web-сервер <a name="web-server"></a>
+----------
+
+Web/WebSocket-сервер позволяет пользовательским приложениям читать из ``themylog``. Через него доступны [ленты](#feed), [таймлайны](#collector-timeline), [временные ряды](#collector-timeseries) и [беспорядки](#disorder). Полный (и актуальный) список URL доступен [в исходниках соответствующего модуля](https://github.com/themylogin/themylog/blob/master/themylog/web_server/__init__.py).
+
+Каждый URL доступен как по протоколу HTTP, так и по протоколу WebSocket. Во втором случае сначала высылается тот же ответ, что и по HTTP, а затем в реальном времени его обновления (новые записи лент, новые значения временного ряда, новый список беспорядков). Пример использования WebSocket-сервера:
+
+```javascript
+$(function(){
+    collector("timeseries/find_my_iphone", function(data){
+        $("#charge").text(Math.round(data["content"][0]["batteryLevel"] * 100, 0) + " %");
+    });
+    collector("timeline/alfa-bank", function(data){
+        $("#alfa-bank").text(Math.floor(data["balance"]).toLocaleString("en-US").replace(",", " ") + " р.");
+    });
+});
+
+function collector(url, callback)
+{
+    var ws,
+        connect,
+        on_error;
+    connect = function(){
+        ws = new WebSocket("ws://192.168.0.1:46405/" + url);
+
+        ws.onclose = on_error;
+
+        ws.onmessage = function(event){
+            callback($.parseJSON(event.data));
+        }
+    };
+    on_error = function(){
+        setTimeout(connect, 1000);
+    };
+    connect();
+}
+```
+
+Настраивается Web-сервер в соответствующем разделе конфигурационного файла:
+
+```
+web_server:
+    host:   192.168.0.1
+    port:   46405
+```
+
+Уборка <a name="cleanup"></a>
+------
+
+Модуль уборки периодически удаляет из хранилищ ненужные данные:
+
+```
+cleanup:
+    -
+        period: PT1H
+        records:
+            -
+                logger: [paramiko.transport]
+                level: <= info
+                action: accept
+```
+
+Отладочные и информационные сообщения от модуля `paramiko.transport` (из всех приложений) будут храниться не дольше часа.
