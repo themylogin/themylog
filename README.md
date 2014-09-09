@@ -5,7 +5,7 @@ themylog
  * **Централизованный logging facility**. Основное назначение **themylog** — [приём](#receiver) и [обработка](#handler) [записей](#record) по аналогии с, например, [syslog](http://ru.wikipedia.org/wiki/Syslog). Непосредственно системный демон сообщений он не заменяет, нацеливаясь на обработку тех логов, которые кто-то действительно будет читать, причём не только тогда, когда начнёт происходить что-то странное.
  * **Message bus**. Подключив в качестве обработчика клиент для какого-нибудь брокера сообщений (например, [AMQP](#handler-amqp) + [RabbitMQ](http://www.rabbitmq.com/)) и имея на входе информацию о всех важных и не очень событиях, происходящих в системе, мы получаем шину сообщений, с помощью которой различные приложения и устройства смогут обмениваться информацией в реальном времени, имея минимум зависимостей друг от друга.
  * **Watchdog**. Некоторые события должны происходить регулярно, другие — не происходить вовсе, и если эти условия нарушаются, значит, где-то возник [беспорядок](#disorder). Указав **themylog** признаки беспорядка, можно получить оперативную помощь в его обнаружении и уверенность, что все системы работают верно.
- * **Collector**. Многие приложения, например, «погода» или «баланс» работают по схожему принципу: периодически запускаясь, собирают некоторую обновляющуюся информацию, которую затем распространяют локально. **themylog** предоставляет шаблоны [timeline](#collector-timeline) и [timeseries](#collector-timeseries) для написания подобных приложений, управляет их запуском по расписанию, уведомляет в случае, если в заданный период времени приложению ни разу не удалось обновить информацию, а так же предоставляет WebSocket-сервер для мгновенного уведомления об обновлениях.
+ * **Collector**. Многие приложения, например, «погода» или «баланс» работают по схожему принципу: периодически запускаясь, собирают некоторую обновляющуюся информацию, которую затем распространяют локально. **themylog** предоставляет шаблоны [timeline](#collector-timeline) и [timeseries](#collector-timeseries) для написания подобных приложений, управляет их запуском по расписанию, уведомляет в случае, если в заданный период времени приложению ни разу не удалось обновить информацию, а так же предоставляет [WebSocket-сервер](#web-server) для мгновенного уведомления об обновлениях.
 
 Основные концепции
 ==================
@@ -13,7 +13,7 @@ themylog
 Запись (record)<a name="record"></a>
 ---------------
 
-Концепция *записи* в **themylog** схожа с таковой в любой logging facility (например, [logging в Python](http://docs.python.org/2/library/logging.html)): это просто структура, состоящая из следующих полей:
+Концепция записи в **themylog** схожа с таковой в любой logging facility (например, [logging в Python](http://docs.python.org/2/library/logging.html)): это просто структура, состоящая из следующих полей:
  * **application** — приложение, создавшее запись. Например, `smarthome` («умный дом») или `weather` («погода»).
  * **logger** — подсистема приложения, создавшая запись. При создании записей из приложений на `Python` при помощи модуля `logging`, этому полю соответствует [`LogRecord.name`](http://docs.python.org/2/library/logging.html#logrecord-objects). Примеры: `root` (основной код приложения), `werkzeug` (модуль веб-сервера), `paramiko.transport` (транспортный модуль SSH-клиента), `door_bell` (дверной звонок в умном доме).
  * **datetime** — дата, когда произошло событие, описываемое записью.
@@ -25,7 +25,7 @@ themylog
    * **error** (50) — ошибка. Подобные сообщения игнорировать не стоит, а чтобы их не игнорировали — не стоит ими разбрасываться попусту.
  * **msg** — идентификатор вашего события внутри logger. Для записей из модуля `logging` это поле `LogRecord.msg`, приведённое к виду `[a-z0-9_]+`. Примеры: `device_list_was_changed`, `creating_device_s`.
  * **args** — словарь, описывающий детали события в структурированном виде. Например: `{"mac-address": "00:22:d4:06:38:11"}`.
- * **explanation** — понятное человеку описание события. Например, `Creating device 00:22:d4:06:38:11`.
+ * **explanation** — понятное человеку описание события. Например, `Creating device 00:22:d4:06:38:11`. Для записей из модуля `logging` это поле `LogRecord.msg`, отформатированное аргументами.
 
 Правила для записей<a name="record-rules"></a>
 -------------------
@@ -128,7 +128,7 @@ Message with value!
   ```
   receivers:
       - UnixServer:
-        path:   /run/themylog/themylog.sock
+          path:   /run/themylog/themylog.sock
   ```
 
 Обработчик (handler)<a name="handler"></a>
@@ -160,8 +160,10 @@ Message with value!
   result = mq_channel.queue_declare(exclusive=True)
   queue_name = result.method.queue
 
-  mq_channel.queue_bind(exchange="themylog", queue=queue_name, routing_key="smarthome.sleep_tracker.sleep_tracked")
-  mq_channel.basic_consume(lambda ch, method, properties, body: HANDLE(themyutils.json.loads(body)["args"]),
+  mq_channel.queue_bind(exchange="themylog", queue=queue_name,
+                        routing_key="smarthome.sleep_tracker.sleep_tracked")
+  mq_channel.basic_consume(lambda ch, method, properties, body:\
+                               HANDLE(themyutils.json.loads(body)["args"]),
                            queue=queue_name, no_ack=True)
 
   mq_channel.start_consuming()
@@ -199,16 +201,14 @@ Message with value!
     "disorder": {
       datetime: "datetime(2014-08-20T02:00:04.189521)",
       reason: [
-        [
-          {
-            "is_disorder": false,
-            "disorder": "Камера в подъезде: Работает"
-          },
-          {
-            "is_disorder": true,
-            "disorder": "Камера в отсечке: Не работает"
-          }
-        ]
+        {
+          "is_disorder": false,
+          "disorder": "Камера в подъезде: Работает"
+        },
+        {
+          "is_disorder": true,
+          "disorder": "Камера в отсечке: Не работает"
+        }
       ],
       data: ...
     },
@@ -248,7 +248,12 @@ Message with value!
       directory:  /home/themylogin/www/apps/themylog_disorder_seekers
   ```
   
-  Поддерживаются [аннотации](#annotation) ``crontab`` и ``title``. Искатель импортирует создаёт экземпляры класса ``Disorder(title)`` из пакета ``themylog.disorder.script`` и вызывает у них методы ``ok``/``fail``/``exception`` в случае, если беспорядок не обнаружен/обнаружен/не удалось провести процедуру обнаружения. Пример такого скрипта, проверяющего, что на всех компьютерах в сети Ethernet-линки — гигабитные:
+  Поддерживаются следующие [аннотации](#annotation):
+  
+  * ``crontab`` (обязательно) — расписание запуска искателя. Эквивалент [crontab schedule из celery](http://celery.readthedocs.org/en/latest/userguide/periodic-tasks.html#crontab-schedules)
+  * ``title`` (обязательно) — человекочитаемое название группы беспорядков, которую пытается обнаружить искатель
+  
+  Искатель импортирует создаёт экземпляры класса ``Disorder(title)`` из пакета ``themylog.disorder.script`` и вызывает у них методы ``ok``/``fail``/``exception`` в случае, если беспорядок не обнаружен/обнаружен/не удалось провести процедуру обнаружения. Пример такого скрипта, проверяющего, что на всех компьютерах в сети Ethernet-линки — гигабитные:
   
   ```python
   # -*- coding: utf-8 -*-
@@ -312,7 +317,14 @@ collectors:
     directory:  /home/themylogin/www/apps/themylog_collectors
 ```
 
-Поддерживаются [аннотации](#annotation) ``allowed_downtime`` (по умолчанию 1 час), ``schedule``, ``title`` и ``timeout`` (по умолчанию 1 минута).
+Поддерживаются следующие [аннотации](#annotation):
+  
+* ``crontab`` (обязательно) — расписание запуска собирателя. Эквивалент [crontab schedule из celery](http://celery.readthedocs.org/en/latest/userguide/periodic-tasks.html#crontab-schedules)
+* ``title`` (обязательно) — человекочитаемое название собирателя
+* ``allowed_downtime`` (по умолчанию 1 час) — период, в течение которого собирателю разрешено завершаться с ошибкой. По истечении этого периода будет создан [беспорядок](#disorder)
+* ``timeout`` (по умолчанию 1 минута) — максимальное время выполнения собирателя
+
+Собиратели работают по одному из следующих шаблонов:
 
 * <a name="collector-timeline"></a>**Timeline (история)**
 
@@ -320,7 +332,7 @@ collectors:
   ```
   [
     {
-      text: "...",
+      text: "Иван Иванович! Сообщаем Вам, что 02.08.2014 в 21:43:17 по Вашей банковской карте ВТБ24 **** произведена транзакция по оплате на сумму 39.00 RUR. Доступно к использованию 387.84 RUR. Детали платежа: место - PEREKRESTOK KIEVSKAYA P, код авторизации - 213479.",
       balance: 387.84,
       write_off_currency: "RUR",
       write_off: 39,
@@ -345,6 +357,14 @@ collectors:
   for uid in reversed(mail.uid("search", None, "(FROM \"notify@vtb24.ru\")")[1][0].split()):
       if timeline.contains(uid):
           break
+      
+      ...
+      
+      datetime_match = re.search("[0-9.]+ в [0-9:]+", text)
+      if datetime_match is None:
+          continue
+          
+      datetime_ = dateutil.parser.parse(datetime_match.group(0).replace("в", ""), dayfirst=True)
   
       ...
   
