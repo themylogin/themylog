@@ -198,5 +198,5 @@ class WebApplication(object):
             return Response(self.serialize_disorders(self.disorders), mimetype="application/json")
 
     def serialize_disorders(self, disorders):
-        return themyutils.json.dumps([dict(title=title, **disorder._asdict())
-                                      for title, disorder in disorders.iteritems()])
+        return themyutils.json.dumps([dict(title=title, **(maybe._asdict() if maybe else {"disorder": None}))
+                                      for title, maybe in disorders.iteritems()])
