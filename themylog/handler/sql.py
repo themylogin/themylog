@@ -27,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
+index_columns = ["application", "logger", "datetime", "level", "msg"]
+
+
+def index_name(index):
+    return "_".join(index)
+
 
 class SQLRecord(Base):
     __tablename__ = "log"
@@ -41,10 +47,10 @@ class SQLRecord(Base):
     explanation = Column(Text(), nullable=False)
 
     __table_args__ = tuple(
-        Index("_".join(index), *index)
+        Index(index_name(index), *index)
         for index in set(
             sum(sum([[[combination, combination + ("datetime",)] if "datetime" not in combination else [combination]
-                      for combination in combinations(["application", "logger", "datetime", "level", "msg"], r + 1)]
+                      for combination in combinations(index_columns, r + 1)]
                      for r in range(5)], []), [])
         )
     )
@@ -119,4 +125,28 @@ class SQL(object):
         if rules_tree:
             query = query.filter(self.rules_tree_evaluator.eval(rules_tree))
 
+            index = self._build_index(rules_tree)
+            if index:
+                if "datetime" not in index:
+                    index.append("datetime")
+                query = query.with_hint(SQLRecord, "USE INDEX(%s)" % index_name(index))
+
         return query
+
+    def _build_index(self, rules_tree):
+        if rules_tree[0] == operator.or_:
+            return None
+
+        index = []
+        for arg in rules_tree[1:]:
+            if isinstance(arg, tuple):
+                arg_index = self._build_index(arg)
+                if arg_index:
+                    for field in arg_index:
+                        if field in index_columns and field not in index:
+                            index.append(field)
+
+            if callable(arg):
+                arg(lambda field: index.append(field) if field in index_columns and field not in index else None)
+
+        return index
