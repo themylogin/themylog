@@ -10,7 +10,6 @@ import yaml
 
 from themylog.config.disorders import get_record_based_disorder_seeker
 from themylog.level import levels
-
 from ..seeker import DisorderSeekerAbstractTestCase
 
 

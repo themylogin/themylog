@@ -3,15 +3,9 @@ from __future__ import absolute_import, division, unicode_literals
 
 from datetime import datetime, timedelta
 from mock import MagicMock, Mock
-import operator
-from testfixtures import Replacer
-import textwrap
-import unittest
-import yaml
 
 from themylog.disorder.collector import CollectorDisorderSeeker
 from themylog.level import levels
-
 from ..seeker import DisorderSeekerAbstractTestCase
 
 
