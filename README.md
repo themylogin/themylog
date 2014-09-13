@@ -408,6 +408,8 @@ collectors:
   ts = TimeSeries()
   ts.weather(...)
   ```
+  
+  Необязательный GET-параметр `timeout` (по умолчанию отсутствует) позволяет выводить `null` вместо устаревших записей. Например, по адресу ``http://<themylog-web-server>/timeseries/theMediaShell?timeout=5`` можно следить за статусом [theMediaShell](https://github.com/themylogin/theMediaShell), но если завершить плеер некорректно, через пять секунд по этому адресу будет `null`, несмотря на то, что сообщений о завершении от него не поступало.
 
 Процессор (processor)<a name="processor"></a>
 ---------------------
