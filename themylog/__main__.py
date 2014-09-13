@@ -1,10 +1,16 @@
-from __future__ import absolute_import
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
 
+import argparse
 from celery import Celery
 from celery.app.defaults import DEFAULT_PROCESS_LOG_FMT
 import logging
 from Queue import Queue
+import sys
 from threading import Thread
+import time
+
+from themyutils.argparse import LoggingLevelType
 
 from themylog.cleanup import setup_cleanup
 from themylog.collector import setup_collectors
@@ -23,14 +29,19 @@ from themylog.processor import run_processor
 from themylog.web_server import setup_web_server
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG, format=DEFAULT_PROCESS_LOG_FMT)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config")
+    parser.add_argument("-l", "--level", type=LoggingLevelType, default=logging.INFO)
+    args = parser.parse_args(sys.argv[1:])
+
+    logging.basicConfig(level=args.level, format=DEFAULT_PROCESS_LOG_FMT)
     logger = logging.getLogger(__name__)
 
-    config = read_config(find_config())
+    config = read_config(args.config or find_config())
 
     record_queue = Queue()
 
-    logging.info("Creating receivers")
+    logger.info("Creating receivers")
 
     receivers = create_receivers(config)
 
@@ -46,11 +57,26 @@ if __name__ == "__main__":
         receiver_thread.daemon = True
         receiver_thread.start()
 
-    logging.info("Creating handlers")
+    logger.info("Creating handlers")
 
     handlers = create_handlers(config)
 
-    logging.info("Creating feeds")
+    logger.info("Starting heartbeat")
+
+    heartbeats = []
+
+    def heartbeat_thread_body():
+        while True:
+            for heartbeat in heartbeats:
+                heartbeat.heartbeat()
+
+            time.sleep(1)
+
+    heartbeat_thread = Thread(target=heartbeat_thread_body)
+    heartbeat_thread.daemon = True
+    heartbeat_thread.start()
+
+    logger.info("Creating feeds")
 
     feeds = get_feeds(config)
 
@@ -58,28 +84,28 @@ if __name__ == "__main__":
         if IFeedsAware.providedBy(handler):
             handler.set_feeds(feeds)
 
-    logging.info("Setting up web server")
+    logger.info("Setting up web server")
 
     web_server = None
     if "web_server" in config:
-        web_server = setup_web_server(config["web_server"], handlers, feeds)
+        web_server = setup_web_server(config["web_server"], handlers, heartbeats, feeds)
 
-    logging.info("Creating scheduler")
+    logger.info("Creating scheduler")
 
     celery = Celery()
     celery.config_from_object(config["celery"])
 
-    logging.info("Setting up cleanups")
+    logger.info("Setting up cleanups")
 
     cleanups = get_cleanups(config)
     setup_cleanup(celery, cleanups, handlers)
 
-    logging.info("Setting up collectors")
+    logger.info("Setting up collectors")
 
     collectors = get_collectors(config)
     setup_collectors(celery, collectors)
 
-    logging.info("Setting up disorders")
+    logger.info("Setting up disorders")
 
     disorder_manager, script_disorder_seekers = get_disorders(config, handlers)
     setup_collector_disorder_seekers(disorder_manager, collectors)
@@ -88,13 +114,13 @@ if __name__ == "__main__":
     if web_server:
         disorder_manager.add_observer(web_server)
 
-    logging.info("Setting up processors")
+    logger.info("Setting up processors")
 
     processors = get_processors(config)
 
-    logging.info("Starting scheduler")
+    logger.info("Starting scheduler")
 
-    celery_beat = celery.Beat()
+    celery_beat = celery.Beat(loglevel=args.level)
     celery_beat.set_process_title = lambda: None
     celery_beat_thread = Thread(target=celery_beat.run)
     celery_beat_thread.daemon = True
@@ -104,10 +130,11 @@ if __name__ == "__main__":
     celery_worker_thread.daemon = True
     celery_worker_thread.start()
 
-    logging.info("Running")
+    logger.info("Running")
 
     while True:
         record = record_queue.get()
+        logger.debug("Processing record")
 
         for handler in handlers:
             handler.handle(record)

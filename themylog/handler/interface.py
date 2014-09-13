@@ -14,3 +14,8 @@ class IRetrieveCapable(zope.interface.Interface):
 class ICleanupCapable(zope.interface.Interface):
     def cleanup(self, rules_tree, older_than):
         """Delete records matching conditions and older than period from handler"""
+
+
+class IRequiresHeartbeat(zope.interface.Interface):
+    def heartbeat(self):
+        """Will be called every second when there are no records"""

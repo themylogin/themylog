@@ -37,7 +37,7 @@ def index_name(index):
 class SQLRecord(Base):
     __tablename__ = "log"
 
-    id          = Column(BigInteger, primary_key=True)
+    id          = Column(Integer, primary_key=True)
     application = Column(String(length=255), nullable=False)
     logger      = Column(String(length=255), nullable=False)
     datetime    = Column(DateTime(), nullable=False)
@@ -77,14 +77,14 @@ class SQL(object):
             }
         )
 
-        self.persister_thread = Thread(target=self._persister_thread)
-        self.persister_thread.daemon = True
-        self.persister_thread.start()
-
         try:
             Base.metadata.create_all(create_engine(self.dsn))
         except:
             logger.exception("An exception occurred while issuing Base.metadata.create_all")
+
+        self.persister_thread = Thread(target=self._persister_thread)
+        self.persister_thread.daemon = True
+        self.persister_thread.start()
 
     def handle(self, record):
         self.query_queue.put(SQLRecord.__table__.insert().values(**record._asdict()))

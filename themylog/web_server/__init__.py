@@ -1,6 +1,7 @@
 # -*- coding=utf-8 -*-
 from __future__ import absolute_import, division, unicode_literals
 
+from datetime import datetime, timedelta
 import operator
 from Queue import Queue
 from threading import Thread
@@ -12,12 +13,12 @@ from zope.interface import implements
 import themyutils.json
 
 from themylog.disorder.manager import IDisorderManagerObserver
-from themylog.handler.interface import IHandler, IRetrieveCapable
+from themylog.handler.interface import IHandler, IRetrieveCapable, IRequiresHeartbeat
 from themylog.record.serializer import serialize_json
 from themylog.rules_tree import match_record
 
 
-def setup_web_server(configuration, handlers, feeds):
+def setup_web_server(configuration, handlers, heartbeats, feeds):
     for handler in handlers:
         if IRetrieveCapable.providedBy(handler):
             retriever = handler
@@ -32,12 +33,13 @@ def setup_web_server(configuration, handlers, feeds):
     thread.start()
 
     handlers.append(web_application)
+    heartbeats.append(web_application)
 
     return web_application
 
 
 class WebApplication(object):
-    implements(IHandler, IDisorderManagerObserver)
+    implements(IHandler, IRequiresHeartbeat, IDisorderManagerObserver)
 
     def __init__(self, configuration, retriever, feeds):
         self.configuration = configuration
@@ -83,6 +85,10 @@ class WebApplication(object):
             queue.put(disorders)
             async.send()
 
+    def heartbeat(self):
+        for queue, async in self.queues.copy():
+            async.send()
+
     def wsgi_app(self, environ, start_response):
         request = Request(environ)
         try:
@@ -104,7 +110,7 @@ class WebApplication(object):
 
         limit = request.args.get("limit", 50, int)
 
-        return self.serve_records(request, rules_tree, limit)
+        return self.serve_records(request, rules_tree, limit, None)
 
     def execute_timeline(self, request, application, logger=None):
         rules_tree = (operator.eq, lambda k: k("application"), application)
@@ -114,7 +120,7 @@ class WebApplication(object):
 
         limit = request.args.get("limit", 1, int)
 
-        return self.serve_records(request, rules_tree, limit,
+        return self.serve_records(request, rules_tree, limit, None,
                                   serialize_one=lambda record: themyutils.json.dumps(record.args),
                                   serialize_collection=lambda records: themyutils.json.dumps([record.args
                                                                                               for record in records]))
@@ -128,14 +134,21 @@ class WebApplication(object):
         if msg is not None:
             rules_tree = (operator.and_, rules_tree, (operator.eq, lambda k: k("msg"), msg))
 
-        return self.serve_records(request, rules_tree, 1,
+        timeout = request.args.get("timeout", type=int)
+
+        return self.serve_records(request, rules_tree, 1, timeout,
                                   serialize_one=lambda record: themyutils.json.dumps(record.args),
                                   serialize_collection=lambda records: themyutils.json.dumps(records[0].args if records
                                                                                              else None))
 
-    def serve_records(self, request, rules_tree, limit,
+    def serve_records(self, request, rules_tree, limit, timeout,
                       serialize_one=serialize_json,
                       serialize_collection=lambda records: "[" + ",".join(map(serialize_json, records)) + "]"):
+        records = self.retriever.retrieve((operator.and_, rules_tree, (operator.gt, lambda k: k("datetime"),
+                                                                       datetime.now() - timedelta(seconds=timeout)))
+                                          if timeout else rules_tree,
+                                          limit)
+
         if "wsgi.websocket" in request.environ:
             queue = Queue()
             async = self.gevent.get_hub().loop.async()
@@ -143,19 +156,29 @@ class WebApplication(object):
 
             ws = request.environ["wsgi.websocket"]
 
+            last_record = None
             try:
-                records = self.retriever.retrieve(rules_tree, limit)
-
                 for record in reversed(records):
                     ws.send(serialize_one(record))
+                    last_record = record
 
                 while True:
                     self.gevent.get_hub().wait(async)
 
+                    expires = datetime.now() - timedelta(seconds=timeout) if timeout else None
                     while not queue.empty():
                         record = queue.get()
                         if rules_tree is None or match_record(rules_tree, record):
-                            ws.send(serialize_one(record))
+                            if not expires or record.datetime > expires:
+                                ws.send(serialize_one(record))
+                                last_record = record
+
+                    if (limit == 1 and
+                            expires and
+                            last_record is not None and
+                            last_record.datetime < expires):
+                        ws.send("null")
+                        last_record = None
             except self.WebSocketError:
                 pass
             finally:
@@ -166,7 +189,6 @@ class WebApplication(object):
 
             return Response()
         else:
-            records = self.retriever.retrieve(rules_tree, limit)
             return Response(serialize_collection(records), mimetype="application/json")
 
     def execute_disorders(self, request):

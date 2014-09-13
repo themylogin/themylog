@@ -20,6 +20,8 @@ setup(
     setup_requires=[
         "mock",
         "nose>=1.0",
-        "testfixtures"
+        "testfixtures",
+        "tl.testing",
+        "websocket-client",
     ],
 )
