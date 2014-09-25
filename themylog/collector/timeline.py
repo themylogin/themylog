@@ -28,7 +28,12 @@ class Timeline(Collector):
         else:
             raise Exception("You should have at least one handler that is IRetrieveCapable to use Timeline collector")
 
+        self.stored_keys = set()
+
     def contains(self, key):
+        if key in self.stored_keys:
+            return True
+
         return len(self.retriever.retrieve((operator.and_,
                                                (operator.eq, lambda k: k("application"), self.application),
                                                (operator.and_,
