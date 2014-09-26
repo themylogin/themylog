@@ -94,6 +94,7 @@ if __name__ == "__main__":
 
     celery = Celery()
     celery.config_from_object(config["celery"])
+    web_server.celery = celery
 
     logger.info("Setting up cleanups")
 

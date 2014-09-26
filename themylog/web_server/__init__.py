@@ -55,6 +55,7 @@ class WebApplication(object):
             Rule("/timeseries/<application>/<logger>", endpoint="timeseries"),
             Rule("/timeseries/<application>/<logger>/<msg>", endpoint="timeseries"),
             Rule("/disorders", endpoint="disorders"),
+            Rule("/run/collector/<collector>", endpoint="run_collector"),
         ])
 
         self.gevent = None
@@ -63,6 +64,8 @@ class WebApplication(object):
 
         self.disorders = {}
         self.disorder_queues = set()
+
+        self.celery = None
 
     def serve_forever(self):
         import gevent
@@ -222,3 +225,15 @@ class WebApplication(object):
     def serialize_disorders(self, disorders):
         return themyutils.json.dumps([dict(title=title, **(maybe._asdict() if maybe else {"disorder": None}))
                                       for title, maybe in disorders.iteritems()])
+
+    def execute_run_collector(self, request, collector):
+        if self.celery is None:
+            return Response("Celery is unavailable", 503)
+
+        task = self.celery.tasks.get("collectors.%s" % collector)
+        if task is None:
+            return Response("Collector does not exist. Available collectors: %s" %
+                            ", ".join([key for key in self.celery.tasks if key.startswith("collectors.")]), 404)
+
+        task.delay()
+        return Response()
