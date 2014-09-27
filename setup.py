@@ -13,7 +13,6 @@ setup(
     long_description=open('README.md').read(),
     install_requires=[
         "celery",
-        "dateutil",
         "isodate",
         "pyyaml",
         "themyutils",
