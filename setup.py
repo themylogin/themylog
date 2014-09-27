@@ -21,8 +21,7 @@ setup(
         "werkzeug",
         "zope.interface >= 4.0.5",
     ],
-    setup_requires=[
-        "manuel",
+    tests_require=[
         "mock",
         "nose>=1.0",
         "testfixtures",
