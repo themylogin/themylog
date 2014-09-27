@@ -1,7 +1,13 @@
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
+
 import logging
+from mock import Mock
+from testfixtures import replace
 import unittest
 
 from themylog.client import LoggingHandler
+
 
 class GetLevelTestCase(unittest.TestCase):
     def create_fake_record(self, **kwargs):
@@ -18,11 +24,15 @@ class GetLevelTestCase(unittest.TestCase):
 
         return logging.LogRecord(**record_kwargs)
 
+    @replace("themylog.config.find_config", Mock())
+    @replace("themylog.config.read_config", Mock(return_value={}))
     def test_ordinary_record(self):
         h = LoggingHandler(None)
         r = self.create_fake_record(level=logging.WARNING)
         self.assertEqual(h._get_level(r), "warning")
 
+    @replace("themylog.config.find_config", Mock())
+    @replace("themylog.config.read_config", Mock(return_value={}))
     def test_exception_record(self):
         h = LoggingHandler(None, exception_level="error")
         r = self.create_fake_record(level=logging.WARNING, exc_info=(Exception,))
@@ -30,6 +40,8 @@ class GetLevelTestCase(unittest.TestCase):
 
 
 class UnderscoreMessageTestCase(unittest.TestCase):
+    @replace("themylog.config.find_config", Mock())
+    @replace("themylog.config.read_config", Mock(return_value={}))
     def setUp(self):
         self.h = LoggingHandler(None)
 
