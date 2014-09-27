@@ -1,5 +1,12 @@
-from __future__ import absolute_import
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
 
-from themylog.handler.amqp import *
-from themylog.handler.sql import *
+try:
+    from themylog.handler.amqp import *
+except ImportError:
+    pass
 
+try:
+    from themylog.handler.sql import *
+except ImportError:
+    pass
