@@ -20,8 +20,7 @@ setup(
         "threadpool",
         "werkzeug",
         "zope.interface >= 4.0.5",
-    ],
-    tests_require=[
+
         "mock",
         "nose>=1.0",
         "testfixtures",

@@ -4,4 +4,4 @@ python:
 install:
   - "python setup.py install"
 script:
-  - "nosetests"
+  - "python setup.py test"
