@@ -23,6 +23,7 @@ setup(
 
         "mock",
         "nose>=1.0",
+        "requests",
         "testfixtures",
         "tl.testing",
         "websocket-client",
