@@ -253,59 +253,7 @@ Message with value!
   * ``crontab`` (обязательно) — расписание запуска искателя. Эквивалент [crontab schedule из celery](http://celery.readthedocs.org/en/latest/userguide/periodic-tasks.html#crontab-schedules)
   * ``title`` (обязательно) — человекочитаемое название группы беспорядков, которую пытается обнаружить искатель
   
-  Искатель импортирует создаёт экземпляры класса ``Disorder(title)`` из пакета ``themylog.disorder.script`` и вызывает у них методы ``ok``/``fail``/``exception`` в случае, если беспорядок не обнаружен/обнаружен/не удалось провести процедуру обнаружения. Пример такого скрипта, проверяющего, что на всех компьютерах в сети Ethernet-линки — гигабитные:
-  
-  ```python
-  # -*- coding: utf-8 -*-
-  # crontab(minute="*/30")
-  # title = "Ethernet-линки"
-  from __future__ import unicode_literals
-  
-  import paramiko
-  import subprocess
-  
-  from themylog.disorder.script import Disorder
-  
-  
-  def check_gigabit(disorder, ethtool_output):
-      if "\tSpeed: 1000Mb/s" in ethtool_output:
-          disorder.ok("Линк 1000Mb/s")
-      elif "\tSpeed: 100Mb/s" in ethtool_output:
-          disorder.fail("Линк 100Mb/s")
-      elif "\tSpeed: 10Mb/s" in ethtool_output:
-          disorder.fail("Линк 10Mb/s")
-      else:
-          disorder.fail("Не удалось разобрать вывод ethtool", ethtool_output=ethtool_output)
-  
-  
-  if __name__ == "__main__":
-      disorder = Disorder("Сервер")
-      try:
-          server_output = subprocess.check_output(["sudo", "ethtool", "eth0"])
-      except:
-          disorder.exception("Не удалось запустить ethtool")
-      else:
-          check_gigabit(disorder, server_output)
-  
-      for host, disorder_name, interface in [("192.168.0.3", "Десктоп", "p2p1"),
-                                             ("192.168.0.4", "Медиацентр", "eth0")]:
-          disorder = Disorder(disorder_name)
-  
-          try:
-              connection = paramiko.SSHClient()
-              connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-              connection.connect(host, username="themylogin")
-          except:
-              disorder.exception("Не удалось подключиться к серверу")
-          else:
-              try:
-                  stdin, stdout, stderr = connection.exec_command("sudo ethtool %s" % interface)
-                  output = "".join(stdout.readlines())
-              except:
-                  disorder.exception("Не удалось запустить ethtool")
-              else:
-                  check_gigabit(disorder, output)
-  ```
+  Искатель импортирует создаёт экземпляры класса ``Disorder(title)`` из пакета ``themylog.disorder.script`` и вызывает у них методы ``ok``/``fail``/``exception`` в случае, если беспорядок не обнаружен/обнаружен/не удалось провести процедуру обнаружения. Примеры искателей беспорядков вы можете найти в [репозитарии themylog_disorder_seekers](https://github.com/themylogin/themylog_disorder_seekers).
 
 Собиратель (collector)<a name="collector"></a>
 ----------------------
@@ -340,41 +288,9 @@ collectors:
     }
   ]
   ```
-  Вот пример скрипта, собравшего эти данные:
-  ```python
-  # -*- coding: utf-8 -*-
-  # crontab(minute="*/30")
-  # title = 'Обновление баланса ВТБ24'
-  from __future__ import unicode_literals
   
-  ...
+  Примеры скриптов, собирающих такие данные, вы можете найти в [репозитарии themylog_collectors](https://github.com/themylogin/themylog_collectors), в частности, [vtb24.py](https://github.com/themylogin/themylog_collectors/blob/master/vtb24.py).
   
-  from themylog.collector.timeline import Timeline
-  
-  ...
-  
-  timeline = Timeline()
-  for uid in reversed(mail.uid("search", None, "(FROM \"notify@vtb24.ru\")")[1][0].split()):
-      if timeline.contains(uid):
-          break
-      
-      ...
-      
-      datetime_match = re.search("[0-9.]+ в [0-9:]+", text)
-      if datetime_match is None:
-          continue
-          
-      datetime_ = dateutil.parser.parse(datetime_match.group(0).replace("в", ""), dayfirst=True)
-  
-      ...
-  
-      args = {}
-      args["text"] = text
-  
-      ...
-  
-      timeline.store(uid, args, datetime=datetime_)
-  ```
   Для работы `Timeline` необходим хотя бы один обработчик, реализующий интерфейс `IRetrieveCapable` (способный хранить старые данные и обращаться к ним), например, [SQL](#handler-sql).
 
 * <a name="collector-timeseries"></a>**Timeseries (временной ряд)**
@@ -392,22 +308,8 @@ collectors:
   # http://192.168.0.1:46405/timeseries/t_card/balance
   802
   ```
-  Пример скрипта:
-  ```python
-  # -*- coding: utf-8 -*-
-  # crontab(minute="*/15")
-  # title = 'Обновление погоды'
-  from __future__ import unicode_literals
   
-  ...
-  
-  from themylog.collector.time_series import TimeSeries
-  
-  ...
-  
-  ts = TimeSeries()
-  ts.weather(...)
-  ```
+  Примеры скриптов, собирающих такие данные, вы можете найти в [репозитарии themylog_collectors](https://github.com/themylogin/themylog_collectors), в частности, [weather.py](https://github.com/themylogin/themylog_collectors/blob/master/weather.py) и [t_card.py](https://github.com/themylogin/themylog_collectors/blob/master/t_card.py).
   
   Необязательный GET-параметр `timeout` (по умолчанию отсутствует) позволяет выводить `null` вместо устаревших записей. Например, по адресу ``http://<themylog-web-server>/timeseries/theMediaShell?timeout=5`` можно следить за статусом [theMediaShell](https://github.com/themylogin/theMediaShell), но если завершить плеер некорректно, через пять секунд по этому адресу будет `null`, несмотря на то, что сообщений о завершении от него не поступало.
 
@@ -421,33 +323,7 @@ processors:
     directory:  /home/themylogin/www/apps/themylog_processors
 ```
 
-Пример процессора:
-
-```python
-# -*- coding=utf-8 -*-
-from __future__ import absolute_import, division, unicode_literals
-
-from themylog.level import levels
-from themylog.record import Record
-
-
-def process(record):
-    if record.application == "sms" and record.logger == "Alfa-Bank":
-        args = None
-        if record.explanation.count("; ") >= 3:
-            args = {...}
-        else:
-            raise Exception("Bad message")
-
-        if args is not None:
-            return Record(application="alfa-bank",
-                          logger="root",
-                          datetime=record.datetime,
-                          level=levels["info"],
-                          msg=record.msg,
-                          args=args,
-                          explanation="")
-```
+Примеры процессоров вы можете найти в [репозитарии themylog_processors](https://github.com/themylogin/themylog_processors).
 
 Для того, чтобы запустить вновь написанный процессор для уже существующих записей, выполните следующую команду:
 
