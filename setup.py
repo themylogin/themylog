@@ -15,10 +15,10 @@ setup(
         "celery",
         "dateutil",
         "isodate",
+        "pyyaml",
         "themyutils",
         "threadpool",
         "werkzeug",
-        "yaml",
         "zope.interface >= 4.0.5",
     ],
     setup_requires=[
