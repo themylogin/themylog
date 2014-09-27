@@ -9,6 +9,13 @@ import unittest
 from themylog.client import LoggingHandler
 
 
+def instantiates_client(test):
+    test = replace("themylog.client.find_config", Mock())(test)
+    test = replace("themylog.client.read_config", Mock(return_value={"receivers": [],
+                                                                     "handlers": []}))
+    return test
+
+
 class GetLevelTestCase(unittest.TestCase):
     def create_fake_record(self, **kwargs):
         record_kwargs = dict(name="root",
@@ -24,15 +31,13 @@ class GetLevelTestCase(unittest.TestCase):
 
         return logging.LogRecord(**record_kwargs)
 
-    @replace("themylog.client.find_config", Mock())
-    @replace("themylog.client.read_config", Mock(return_value={}))
+    @instantiates_client
     def test_ordinary_record(self):
         h = LoggingHandler(None)
         r = self.create_fake_record(level=logging.WARNING)
         self.assertEqual(h._get_level(r), "warning")
 
-    @replace("themylog.client.find_config", Mock())
-    @replace("themylog.client.read_config", Mock(return_value={}))
+    @instantiates_client
     def test_exception_record(self):
         h = LoggingHandler(None, exception_level="error")
         r = self.create_fake_record(level=logging.WARNING, exc_info=(Exception,))
@@ -40,8 +45,7 @@ class GetLevelTestCase(unittest.TestCase):
 
 
 class UnderscoreMessageTestCase(unittest.TestCase):
-    @replace("themylog.client.find_config", Mock())
-    @replace("themylog.client.read_config", Mock(return_value={}))
+    @instantiates_client
     def setUp(self):
         self.h = LoggingHandler(None)
 
