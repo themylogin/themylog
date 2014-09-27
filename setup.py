@@ -13,8 +13,12 @@ setup(
     long_description=open('README.md').read(),
     install_requires=[
         "celery",
+        "dateutil",
         "isodate",
+        "themyutils",
         "threadpool",
+        "werkzeug",
+        "yaml",
         "zope.interface >= 4.0.5",
     ],
     setup_requires=[
@@ -23,5 +27,8 @@ setup(
         "testfixtures",
         "tl.testing",
         "websocket-client",
+    ],
+    dependency_links=[
+        "https://github.com/themylogin/themyutils/archive/master.zip#egg=themyutils",
     ],
 )
