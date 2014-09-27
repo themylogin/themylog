@@ -24,6 +24,7 @@ setup(
         "mock",
         "nose>=1.0",
         "requests",
+        "sqlalchemy",
         "testfixtures",
         "tl.testing",
         "websocket-client",
