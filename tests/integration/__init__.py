@@ -6,6 +6,7 @@ import copy
 import fcntl
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -19,11 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 class IntegrationTestCase(ThreadAwareTestCase):
+    SCRIPT_CATEGORIES = ("collectors", "disorders", "processors", "analytics")
+
     def setUp(self):
         self.unix_socket_path = None
         self.unix_socket = None
         self.sqlite_database_path = None
         self.celerybeat_schedule_path = None
+        self.scripts_path = tempfile.mkdtemp()
+        for script_category in self.SCRIPT_CATEGORIES:
+            os.mkdir(os.path.join(self.scripts_path, script_category))
         self.config_file = None
         self.processes = []
 
@@ -37,10 +43,15 @@ class IntegrationTestCase(ThreadAwareTestCase):
                 process.terminate()
                 process.wait()
 
+        shutil.rmtree(self.scripts_path)
+
         os.unlink(self.sqlite_database_path)
         os.unlink(self.celerybeat_schedule_path)
 
         os.unlink(self.unix_socket_path)
+
+    def write_script(self, category, name, code):
+        open(os.path.join(self.scripts_path, category, "%s.py" % name), "w").write(code.encode("utf-8"))
 
     def start(self, config=None):
         if config is None:
@@ -62,6 +73,13 @@ class IntegrationTestCase(ThreadAwareTestCase):
             os.unlink(self.celerybeat_schedule_path)
             config["celery"] = {"BROKER_URL": "sqla+sqlite://",
                                 "CELERYBEAT_SCHEDULE_FILENAME": self.celerybeat_schedule_path}
+
+        for script_category in self.SCRIPT_CATEGORIES:
+            directory = os.path.join(self.scripts_path, script_category)
+            if script_category not in config:
+                config[script_category] = {}
+            if "directory" not in config[script_category]:
+                config[script_category]["directory"] = directory
 
         fh, self.config_file = tempfile.mkstemp()
         with open(self.config_file, "w") as f:
@@ -126,6 +144,7 @@ class IntegrationTestCase(ThreadAwareTestCase):
                 continue
 
             lines.append(line)
+            logging.getLogger("themylog_output").debug(line)
             for expect, event in self.expects.iteritems():
                 if expect in line:
                     event.set()

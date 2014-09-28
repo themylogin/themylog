@@ -14,10 +14,13 @@ class WebserverTestCase(IntegrationTestCase):
     config = {"web_server": {"host": "127.0.0.1",
                              "port": 46406}}
 
-    def assertRequest(self, request, result):
+    def performRequest(self, request):
         r = requests.get("http://%s:%s%s" % (self.config["web_server"]["host"], self.config["web_server"]["port"],
                                              request))
-        self.assertEqual(r.json(), result)
+        return r.json()
+
+    def assertRequest(self, request, result):
+        self.assertEqual(self.performRequest(request), result)
 
     def websocketReader(self, request):
         result = []

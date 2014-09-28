@@ -248,15 +248,72 @@ class WebApplication(object):
 
         kwargs = {}
         for feed in analytics.feeds_order:
-            params = {param: func(**{arg: kwargs[arg] for arg in inspect.getargspec(func).args})
-                      for param, func in analytics.feeds[feed].get("params", {}).iteritems()}
+            rules_tree = self._prepare_analytics_rules_tree(analytics, feed, kwargs)
             limit = analytics.feeds[feed].get("limit", None)
-            kwargs[feed] = self.retriever.retrieve(substitute_parameters(analytics.feeds[feed]["rules_tree"], params),
-                                                   limit)
+            kwargs[feed] = self.retriever.retrieve(rules_tree, limit)
             if limit == 1:
                 if len(kwargs[feed]):
                     kwargs[feed] = kwargs[feed][0]
                 else:
                     kwargs[feed] = None
 
-        return Response(themyutils.json.dumps(analytics.analyze(**kwargs)), mimetype="application/json")
+        self._process_analytics_special_kwargs(analytics, kwargs)
+
+        if "wsgi.websocket" in request.environ:
+            queue = Queue()
+            async = self.gevent.get_hub().loop.async()
+            self.queues.add((queue, async))
+
+            ws = request.environ["wsgi.websocket"]
+
+            try:
+                ws.send(themyutils.json.dumps(analytics.analyze(**kwargs)))
+
+                while True:
+                    self.gevent.get_hub().wait(async)
+
+                    kwargs_modified = False
+                    while not queue.empty():
+                        record = queue.get()
+                        for feed in analytics.feeds_order:
+                            rules_tree = self._prepare_analytics_rules_tree(analytics, feed, kwargs)
+                            limit = analytics.feeds[feed].get("limit", None)
+                            if match_record(rules_tree, record):
+                                if limit == 1:
+                                    kwargs[feed] = record
+                                else:
+                                    kwargs[feed] = [record] + kwargs[feed]
+                                    if limit is not None:
+                                        kwargs[feed] = kwargs[feed][:limit]
+                                kwargs_modified = True
+
+                    kwargs_modified = kwargs_modified or self._process_analytics_special_kwargs(analytics, kwargs)
+
+                    if kwargs_modified:
+                        ws.send(themyutils.json.dumps(analytics.analyze(**kwargs)))
+            except self.WebSocketError:
+                pass
+            finally:
+                self.queues.remove((queue, async))
+
+                if not ws.closed:
+                    ws.close()
+
+            return Response()
+        else:
+            return Response(themyutils.json.dumps(analytics.analyze(**kwargs)), mimetype="application/json")
+
+    def _prepare_analytics_rules_tree(self, analytics, feed, kwargs):
+        params = {param: func(**{arg: kwargs[arg] for arg in inspect.getargspec(func).args})
+                  for param, func in analytics.feeds[feed].get("params", {}).iteritems()}
+        rules_tree = substitute_parameters(analytics.feeds[feed]["rules_tree"], params)
+        return rules_tree
+
+    def _process_analytics_special_kwargs(self, analytics, kwargs):
+        modified = False
+
+        if "now" in inspect.getargspec(analytics.analyze).args:
+            kwargs["now"] = datetime.now()
+            modified = True
+
+        return modified
