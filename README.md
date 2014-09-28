@@ -6,6 +6,7 @@ themylog
  * **Message bus**. Подключив в качестве обработчика клиент для какого-нибудь брокера сообщений (например, [AMQP](#handler-amqp) + [RabbitMQ](http://www.rabbitmq.com/)) и имея на входе информацию о всех важных и не очень событиях, происходящих в системе, мы получаем шину сообщений, с помощью которой различные приложения и устройства смогут обмениваться информацией в реальном времени, имея минимум зависимостей друг от друга.
  * **Watchdog**. Некоторые события должны происходить регулярно, другие — не происходить вовсе, и если эти условия нарушаются, значит, где-то возник [беспорядок](#disorder). Указав **themylog** признаки беспорядка, можно получить оперативную помощь в его обнаружении и уверенность, что все системы работают верно.
  * **Collector**. Многие приложения, например, «погода» или «баланс» работают по схожему принципу: периодически запускаясь, собирают некоторую обновляющуюся информацию, которую затем распространяют локально. **themylog** предоставляет шаблоны [timeline](#collector-timeline) и [timeseries](#collector-timeseries) для написания подобных приложений, управляет их запуском по расписанию, уведомляет в случае, если в заданный период времени приложению ни разу не удалось обновить информацию, а так же предоставляет [WebSocket-сервер](#web-server) для мгновенного уведомления об обновлениях.
+ * **Analytic**. Обладая большим количеством данных, вполне очевидна возможность получать интересные результаты путём их анализа. **themylog** позволяет создавать [аналитики](#analytics) — функции, принимающие определённые наборы данных и возвращающие некий результат. Значения этих функций пересчитываются при поступлении новых данных и доступны в реальном времени через [WebSocket-сервер](#web-server).
 
 Основные концепции
 ==================
@@ -339,10 +340,57 @@ python -m themylog.utils run_processor backup application backup logger root msg
 
 Процессор будет запущен только для записей с `application` = `backup`, `logger` = `root`, `msg` = `finish`.
 
+Аналитика (analytics)<a name="analytics"></a>
+---------------------
+
+``themylog`` позволяет создавать функции, принимающие определённые наборы данных и возвращающие результаты их анализа, которые будут доступны по адресу `http://<themylog-web-server>/analytics/<name>`. Например, аналитика [awake](https://github.com/themylogin/themylog_analytics/blob/master/awake.py) принимает данные о времени засыпания/времени подъёма от [умного дома](https://github.com/themylogin/smarthome) и данные о нажатиях клавиатуры и движении мыши от [UsageStats](https://github.com/themylogin/theDesktopUtils/blob/master/LifeMetrics/UsageStats.cpp) на рабочем компьютере и выводит информацию о том, сколько я бодрствую, и какое время из этого я провёл за работой. Каждая аналитика — это ``*.py``-файл из указанной директории, содержащий переменную ``feeds`` и функцию ``analyze(...)``:
+
+```
+analytics:
+    directory:  /home/themylogin/www/apps/themylog_analytics
+```
+
+Переменная ``feeds`` — это словарь, описывающий [ленты](#feed), которые будут поданы на вход функции ``analyze``. Каждая лента описывается деревом правил, состоящим из кортежей в префиксной нотации с использованием модуля [operator](https://docs.python.org/2/library/operator.html); дополнительно можно указать максимальное количество записей, которые будут выбраны из ленты (по убыванию поля `datetime`):
+
+```python
+from themylog.rules_tree import RecordField as F
+
+feeds = {"last_sleep_track": {"rules_tree": (operator.and_, (operator.eq, F("logger"), "sleep_tracker"),
+                                                            (operator.or_, (operator.eq, F("msg"), "woke_up"),
+                                                                           (operator.eq, F("msg"), "fall_asleep"))),
+                              "limit": 1}}
+```
+
+В этом примере функции ``analyze`` будет подан аргумент ``last_sleep_track``, содержащий запись от логгера ``sleep_tracker`` с ``msg`` либо ``woke_up``, либо ``fall_asleep``.
+
+Ленты могут зависеть друг от друга при помощи вычисляемых параметров. Каждый параметр — это функция, принимающая аргументы с именами, равными именам лент, от которых параметр зависит, и возвращающая значение параметра:
+
+```python
+from themylog.rules_tree import Param as P, RecordField as F
+
+feeds = {"last_sleep_track": {"rules_tree": (operator.and_, (operator.eq, F("logger"), "sleep_tracker"),
+                                                            (operator.or_, (operator.eq, F("msg"), "woke_up"),
+                                                                           (operator.eq, F("msg"), "fall_asleep"))),
+                              "limit": 1},
+         "odometer_logs": {"rules_tree": (operator.and_, (operator.eq, F("application"), "usage_stats"),
+                                                         (operator.gt, F("datetime"), P("last_sleep_track_datetime"))),
+                           "params": {"last_sleep_track_datetime": lambda last_sleep_track: last_sleep_track.args["at"]
+                                                                                            if last_sleep_track.msg == "woke_up"
+                                                                                            else datetime.max}}}
+```
+
+В этом примере будет сначала выбрана запись «заснул или проснулся», вычислено время последнего пробуждения и лишь затем выбраны все записи от приложения ``usage_stats`` за период с момента последнего пробуждения.
+
+Сама функция ``analyze`` принимает списки записей или одну запись/None, если ``limit`` указан и равен 1, а так же следующие специальные аргументы:
+
+* **now** — текущий ``datetime.now()``. Функция, принимающая такой аргумент, будет вызываться каждую секунду.
+
+Примеры аналитик вы можете найти в [репозитарии themylog_analytics](https://github.com/themylogin/themylog_analytics).
+
 Web-сервер <a name="web-server"></a>
 ----------
 
-Web/WebSocket-сервер позволяет пользовательским приложениям читать из ``themylog``. Через него доступны [ленты](#feed), [таймлайны](#collector-timeline), [временные ряды](#collector-timeseries) и [беспорядки](#disorder). Полный (и актуальный) список URL доступен [в исходниках соответствующего модуля](https://github.com/themylogin/themylog/blob/master/themylog/web_server/__init__.py).
+Web/WebSocket-сервер позволяет пользовательским приложениям читать из ``themylog``. Через него доступны [ленты](#feed), [таймлайны](#collector-timeline), [временные ряды](#collector-timeseries), [беспорядки](#disorder) и [аналитики](#analytics). Полный (и актуальный) список URL доступен [в исходниках соответствующего модуля](https://github.com/themylogin/themylog/blob/master/themylog/web_server/__init__.py).
 
 Каждый URL доступен как по протоколу HTTP, так и по протоколу WebSocket. Во втором случае сначала высылается тот же ответ, что и по HTTP, а затем в реальном времени его обновления (новые записи лент, новые значения временного ряда, новый список беспорядков). Пример использования WebSocket-сервера:
 
