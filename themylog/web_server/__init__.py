@@ -291,8 +291,6 @@ class WebApplication(object):
                                             kwargs[feed] = kwargs[feed][:limit]
                                     kwargs_modified = True
 
-                        kwargs_modified = kwargs_modified or self._process_analytics_special_kwargs(analytics, kwargs)
-
                     if kwargs_modified:
                         ws.send(themyutils.json.dumps(analytics.analyze(**kwargs)))
             except self.WebSocketError:
