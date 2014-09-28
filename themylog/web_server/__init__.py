@@ -273,21 +273,25 @@ class WebApplication(object):
                     self.gevent.get_hub().wait(async)
 
                     kwargs_modified = False
-                    while not queue.empty():
-                        record = queue.get()
-                        for feed in analytics.feeds_order:
-                            rules_tree = self._prepare_analytics_rules_tree(analytics, feed, kwargs)
-                            limit = analytics.feeds[feed].get("limit", None)
-                            if match_record(rules_tree, record):
-                                if limit == 1:
-                                    kwargs[feed] = record
-                                else:
-                                    kwargs[feed] = [record] + kwargs[feed]
-                                    if limit is not None:
-                                        kwargs[feed] = kwargs[feed][:limit]
-                                kwargs_modified = True
+                    if queue.empty():
+                        # Just a heartbeat
+                        kwargs_modified = self._process_analytics_special_kwargs(analytics, kwargs)
+                    else:
+                        while not queue.empty():
+                            record = queue.get()
+                            for feed in analytics.feeds_order:
+                                rules_tree = self._prepare_analytics_rules_tree(analytics, feed, kwargs)
+                                limit = analytics.feeds[feed].get("limit", None)
+                                if match_record(rules_tree, record):
+                                    if limit == 1:
+                                        kwargs[feed] = record
+                                    else:
+                                        kwargs[feed] = [record] + kwargs[feed]
+                                        if limit is not None:
+                                            kwargs[feed] = kwargs[feed][:limit]
+                                    kwargs_modified = True
 
-                    kwargs_modified = kwargs_modified or self._process_analytics_special_kwargs(analytics, kwargs)
+                        kwargs_modified = kwargs_modified or self._process_analytics_special_kwargs(analytics, kwargs)
 
                     if kwargs_modified:
                         ws.send(themyutils.json.dumps(analytics.analyze(**kwargs)))
