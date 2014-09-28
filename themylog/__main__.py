@@ -15,6 +15,7 @@ from themyutils.argparse import LoggingLevelType
 from themylog.cleanup import setup_cleanup
 from themylog.collector import setup_collectors
 from themylog.config import find_config, read_config
+from themylog.config.analytics import get_analytics
 from themylog.config.cleanup import get_cleanups
 from themylog.config.collectors import get_collectors
 from themylog.config.disorders import get_disorders
@@ -84,11 +85,15 @@ if __name__ == "__main__":
         if IFeedsAware.providedBy(handler):
             handler.set_feeds(feeds)
 
+    logger.info("Creating analytics")
+
+    analytics = get_analytics(config)
+
     logger.info("Setting up web server")
 
     web_server = None
     if "web_server" in config:
-        web_server = setup_web_server(config["web_server"], handlers, heartbeats, feeds)
+        web_server = setup_web_server(config["web_server"], handlers, heartbeats, feeds, analytics)
 
     logger.info("Creating scheduler")
 

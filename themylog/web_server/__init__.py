@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, unicode_literals
 
 from datetime import datetime, timedelta
+import inspect
 import operator
 from Queue import Queue
 from threading import Thread
@@ -15,10 +16,10 @@ import themyutils.json
 from themylog.disorder.manager import IDisorderManagerObserver
 from themylog.handler.interface import IHandler, IRetrieveCapable, IRequiresHeartbeat
 from themylog.record.serializer import serialize_json
-from themylog.rules_tree import match_record
+from themylog.rules_tree import match_record, substitute_parameters
 
 
-def setup_web_server(configuration, handlers, heartbeats, feeds):
+def setup_web_server(configuration, handlers, heartbeats, feeds, analytics):
     for handler in handlers:
         if IRetrieveCapable.providedBy(handler):
             retriever = handler
@@ -26,7 +27,7 @@ def setup_web_server(configuration, handlers, heartbeats, feeds):
     else:
         raise Exception("You should have at least one handler that is IRetrieveCapable to use web server")
 
-    web_application = WebApplication(configuration, retriever, feeds)
+    web_application = WebApplication(configuration, retriever, feeds, analytics)
 
     thread = Thread(target=web_application.serve_forever)
     thread.daemon = True
@@ -41,14 +42,16 @@ def setup_web_server(configuration, handlers, heartbeats, feeds):
 class WebApplication(object):
     implements(IHandler, IRequiresHeartbeat, IDisorderManagerObserver)
 
-    def __init__(self, configuration, retriever, feeds):
+    def __init__(self, configuration, retriever, feeds, analytics):
         self.configuration = configuration
         self.retriever = retriever
         self.feeds = feeds
+        self.analytics = analytics
 
         self.url_map = Map([
             Rule("/", endpoint="feed"),
             Rule("/feed/<name>", endpoint="feed"),
+            Rule("/analytics/<analytics>", endpoint="analytics"),
             Rule("/timeline/<application>", endpoint="timeline"),
             Rule("/timeline/<application>/<logger>", endpoint="timeline"),
             Rule("/timeseries/<application>", endpoint="timeseries"),
@@ -237,3 +240,23 @@ class WebApplication(object):
 
         task.delay()
         return Response()
+
+    def execute_analytics(self, request, analytics):
+        analytics = self.analytics.get(analytics)
+        if analytics is None:
+            return Response("Analytics does not exist", 404)
+
+        kwargs = {}
+        for feed in analytics.feeds_order:
+            params = {param: func(**{arg: kwargs[arg] for arg in inspect.getargspec(func).args})
+                      for param, func in analytics.feeds[feed].get("params", {}).iteritems()}
+            limit = analytics.feeds[feed].get("limit", None)
+            kwargs[feed] = self.retriever.retrieve(substitute_parameters(analytics.feeds[feed]["rules_tree"], params),
+                                                   limit)
+            if limit == 1:
+                if len(kwargs[feed]):
+                    kwargs[feed] = kwargs[feed][0]
+                else:
+                    kwargs[feed] = None
+
+        return Response(themyutils.json.dumps(analytics.analyze(**kwargs)), mimetype="application/json")
