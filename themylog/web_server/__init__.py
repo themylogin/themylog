@@ -2,7 +2,6 @@
 from __future__ import absolute_import, division, unicode_literals
 
 from datetime import datetime, timedelta
-import inspect
 import operator
 from Queue import Queue
 from threading import Thread
@@ -13,6 +12,7 @@ from zope.interface import implements
 
 import themyutils.json
 
+from themylog.analytics import *
 from themylog.disorder.manager import IDisorderManagerObserver
 from themylog.handler.interface import IHandler, IRetrieveCapable, IRequiresHeartbeat
 from themylog.record.serializer import serialize_json
@@ -246,18 +246,7 @@ class WebApplication(object):
         if analytics is None:
             return Response("Analytics does not exist", 404)
 
-        kwargs = {}
-        for feed in analytics.feeds_order:
-            rules_tree = self._prepare_analytics_rules_tree(analytics, feed, kwargs)
-            limit = analytics.feeds[feed].get("limit", None)
-            kwargs[feed] = self.retriever.retrieve(rules_tree, limit)
-            if limit == 1:
-                if len(kwargs[feed]):
-                    kwargs[feed] = kwargs[feed][0]
-                else:
-                    kwargs[feed] = None
-
-        self._process_analytics_special_kwargs(analytics, kwargs)
+        kwargs = get_analytics_kwargs(analytics, self.retriever)
 
         if "wsgi.websocket" in request.environ:
             queue = Queue()
@@ -275,12 +264,12 @@ class WebApplication(object):
                     kwargs_modified = False
                     if queue.empty():
                         # Just a heartbeat
-                        kwargs_modified = self._process_analytics_special_kwargs(analytics, kwargs)
+                        kwargs_modified = process_analytics_special_kwargs(analytics, kwargs)
                     else:
                         while not queue.empty():
                             record = queue.get()
                             for feed in analytics.feeds_order:
-                                rules_tree = self._prepare_analytics_rules_tree(analytics, feed, kwargs)
+                                rules_tree = prepare_analytics_rules_tree(analytics, feed, kwargs)
                                 limit = analytics.feeds[feed].get("limit", None)
                                 if match_record(rules_tree, record):
                                     if limit == 1:
@@ -304,18 +293,3 @@ class WebApplication(object):
             return Response()
         else:
             return Response(themyutils.json.dumps(analytics.analyze(**kwargs)), mimetype="application/json")
-
-    def _prepare_analytics_rules_tree(self, analytics, feed, kwargs):
-        params = {param: func(**{arg: kwargs[arg] for arg in inspect.getargspec(func).args})
-                  for param, func in analytics.feeds[feed].get("params", {}).iteritems()}
-        rules_tree = substitute_parameters(analytics.feeds[feed]["rules_tree"], params)
-        return rules_tree
-
-    def _process_analytics_special_kwargs(self, analytics, kwargs):
-        modified = False
-
-        if "now" in inspect.getargspec(analytics.analyze).args:
-            kwargs["now"] = datetime.now()
-            modified = True
-
-        return modified
