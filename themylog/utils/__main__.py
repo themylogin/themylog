@@ -5,26 +5,48 @@ import itertools
 import operator
 import sys
 
+import themyutils.json
+
+from themylog.analytics import get_analytics_kwargs
 from themylog.client import Client
 from themylog.config import find_config, read_config
+from themylog.config.analytics import get_analytics
 from themylog.config.handlers import create_handlers
 from themylog.config.processors import get_processors
 from themylog.handler.interface import IRetrieveCapable
 from themylog.processor import run_processor
 
 
+def get_retriever(config):
+    handlers = create_handlers(config)
+
+    for handler in handlers:
+        if IRetrieveCapable.providedBy(handler):
+            return handler
+    else:
+        raise Exception("You should have at least one handler that is IRetrieveCapable to run this command")
+
+
 if __name__ == "__main__":
     config = read_config(find_config())
+
+    if sys.argv[1] == "run_analytics":
+        handlers = create_handlers(config)
+
+        retriever = get_retriever(config)
+
+        analytics = get_analytics(config)
+        if sys.argv[2] in analytics:
+            analytics = analytics[sys.argv[2]]
+            result = analytics.analyze(**get_analytics_kwargs(analytics, retriever))
+            print(themyutils.json.dumps(result, ensure_ascii=False, indent=4))
+        else:
+            print("No analytics '%s' exists" % sys.argv[2])
 
     if sys.argv[1] == "run_processor":
         handlers = create_handlers(config)
 
-        for handler in handlers:
-            if IRetrieveCapable.providedBy(handler):
-                retriever = handler
-                break
-        else:
-            raise Exception("You should have at least one handler that is IRetrieveCapable to run processors")
+        retriever = get_retriever(config)
 
         processors = get_processors(config)
         for processor in processors:
@@ -39,4 +61,4 @@ if __name__ == "__main__":
                         client.log(result)
                 break
         else:
-            print "No processor '%s' exists" % sys.argv[2]
+            print("No processor '%s' exists" % sys.argv[2])
