@@ -16,7 +16,7 @@ from themylog.analytics import *
 from themylog.disorder.manager import IDisorderManagerObserver
 from themylog.handler.interface import IHandler, IRetrieveCapable, IRequiresHeartbeat
 from themylog.record.serializer import serialize_json
-from themylog.rules_tree import match_record, substitute_parameters
+from themylog.rules_tree import match_record
 
 
 def setup_web_server(configuration, handlers, heartbeats, feeds, analytics):
@@ -261,11 +261,11 @@ class WebApplication(object):
                 while True:
                     self.gevent.get_hub().wait(async)
 
-                    kwargs_modified = False
                     if queue.empty():
                         # Just a heartbeat
                         kwargs_modified = process_analytics_special_kwargs(analytics, kwargs)
                     else:
+                        kwargs_modified = set()
                         while not queue.empty():
                             record = queue.get()
                             for feed in analytics.feeds_order:
@@ -278,7 +278,12 @@ class WebApplication(object):
                                         kwargs[feed] = [record] + kwargs[feed]
                                         if limit is not None:
                                             kwargs[feed] = kwargs[feed][:limit]
-                                    kwargs_modified = True
+                                    kwargs_modified.add(feed)
+                        for feed in analytics.feeds_order:
+                            if feed in kwargs_modified:
+                                for dependent_feed in analytics.feeds_dependencies:
+                                    kwargs[dependent_feed] = get_analytics_kwarg(analytics, self.retriever, kwargs,
+                                                                                 dependent_feed)
 
                     if kwargs_modified:
                         ws.send(themyutils.json.dumps(analytics.analyze(**kwargs)))

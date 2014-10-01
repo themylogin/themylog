@@ -150,3 +150,74 @@ class AnalyticsTestCase(WebserverTestCase):
         self.assertEqual(reader[-1]["state"], "up")
         self.assertAlmostEqual(reader[-1]["seconds_up"], 25 * 60 + 5, delta=1)
         self.assertAlmostEqual(reader[-1]["seconds_pc"], 60, delta=1)
+
+    def test_websocket_with_dependent_feeds_reread(self):
+        self.write_script("analytics", "awake", self.awake)
+
+        self.start(self.config)
+
+        self.log_and_wait(Record(application="smarthome",
+                                 logger="sleep_tracker",
+                                 datetime=datetime.now() - timedelta(minutes=100),
+                                 level=levels["info"],
+                                 msg="woke_up",
+                                 args={"at": datetime.now() - timedelta(minutes=120)},
+                                 explanation=""))
+        self.log_and_wait(Record(application="usage_stats",
+                                 logger="desktop",
+                                 datetime=datetime.now() - timedelta(minutes=99),
+                                 level=levels["info"],
+                                 msg="data",
+                                 args={"keys": 3, "pixels": 1920},
+                                 explanation=""))
+        self.log_and_wait(Record(application="usage_stats",
+                                 logger="desktop",
+                                 datetime=datetime.now() - timedelta(minutes=98),
+                                 level=levels["info"],
+                                 msg="data",
+                                 args={"keys": 3, "pixels": 1920},
+                                 explanation=""))
+        reader = self.websocketReader("/analytics/awake")
+
+        time.sleep(0.5)
+        self.assertEqual(len(reader), 1)
+        self.assertEqual(reader[-1]["state"], "up")
+        self.assertAlmostEqual(reader[-1]["seconds_up"], 120 * 60, delta=1)
+        self.assertAlmostEqual(reader[-1]["seconds_pc"], 60, delta=1)
+
+        self.log_and_wait(Record(application="smarthome",
+                                 logger="sleep_tracker",
+                                 datetime=datetime.now() - timedelta(minutes=70),
+                                 level=levels["info"],
+                                 msg="fall_asleep",
+                                 args={"at": datetime.now() - timedelta(minutes=90)},
+                                 explanation=""))
+        time.sleep(0.5)
+        self.assertEqual(len(reader), 2)
+        self.assertEqual(reader[-1]["state"], "down")
+
+        self.log_and_wait(Record(application="smarthome",
+                                 logger="sleep_tracker",
+                                 datetime=datetime.now() - timedelta(minutes=40),
+                                 level=levels["info"],
+                                 msg="woke_up",
+                                 args={"at": datetime.now() - timedelta(minutes=60)},
+                                 explanation=""))
+        self.log_and_wait(Record(application="usage_stats",
+                                 logger="desktop",
+                                 datetime=datetime.now() - timedelta(minutes=39),
+                                 level=levels["info"],
+                                 msg="data",
+                                 args={"keys": 3, "pixels": 1920},
+                                 explanation=""))
+        self.log_and_wait(Record(application="usage_stats",
+                                 logger="desktop",
+                                 datetime=datetime.now() - timedelta(minutes=38),
+                                 level=levels["info"],
+                                 msg="data",
+                                 args={"keys": 3, "pixels": 1920},
+                                 explanation=""))
+        time.sleep(0.5)
+        self.assertEqual(reader[-1]["state"], "up")
+        self.assertAlmostEqual(reader[-1]["seconds_up"], 60 * 60, delta=1)
+        self.assertAlmostEqual(reader[-1]["seconds_pc"], 60, delta=1)

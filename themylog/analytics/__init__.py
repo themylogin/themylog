@@ -6,24 +6,30 @@ import inspect
 
 from themylog.rules_tree import substitute_parameters
 
-__all__ = [b"get_analytics_kwargs", b"prepare_analytics_rules_tree", b"process_analytics_special_kwargs"]
+__all__ = [b"get_analytics_kwargs", b"get_analytics_kwarg", b"prepare_analytics_rules_tree",
+           b"process_analytics_special_kwargs"]
 
 
 def get_analytics_kwargs(analytics, retriever):
     kwargs = {}
     for feed in analytics.feeds_order:
-        rules_tree = prepare_analytics_rules_tree(analytics, feed, kwargs)
-        limit = analytics.feeds[feed].get("limit", None)
-        kwargs[feed] = retriever.retrieve(rules_tree, limit)
-        if limit == 1:
-            if len(kwargs[feed]):
-                kwargs[feed] = kwargs[feed][0]
-            else:
-                kwargs[feed] = None
+        kwargs[feed] = get_analytics_kwarg(analytics, retriever, kwargs, feed)
 
     process_analytics_special_kwargs(analytics, kwargs)
 
     return kwargs
+
+
+def get_analytics_kwarg(analytics, retriever, kwargs, feed):
+    rules_tree = prepare_analytics_rules_tree(analytics, feed, kwargs)
+    limit = analytics.feeds[feed].get("limit", None)
+    kwarg = retriever.retrieve(rules_tree, limit)
+    if limit == 1:
+        if len(kwarg):
+            kwarg = kwarg[0]
+        else:
+            kwarg = None
+    return kwarg
 
 
 def prepare_analytics_rules_tree(analytics, feed, kwargs):
@@ -32,11 +38,12 @@ def prepare_analytics_rules_tree(analytics, feed, kwargs):
     rules_tree = substitute_parameters(analytics.feeds[feed]["rules_tree"], params)
     return rules_tree
 
+
 def process_analytics_special_kwargs(analytics, kwargs):
-    modified = False
+    modified = set()
 
     if "now" in inspect.getargspec(analytics.analyze).args:
         kwargs["now"] = datetime.now()
-        modified = True
+        modified.add("now")
 
     return modified

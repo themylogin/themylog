@@ -10,7 +10,7 @@ from themyutils.math.graph import toposort
 
 from themylog.config.scripts import find_scripts
 
-Analytics = namedtuple("Analytics", ["annotations", "feeds", "feeds_order", "analyze"])
+Analytics = namedtuple("Analytics", ["annotations", "feeds", "feeds_dependencies", "feeds_order", "analyze"])
 
 
 class BadParameterArgumentException(Exception):
@@ -24,17 +24,18 @@ def get_analytics(config):
         sys.path.insert(0, directory)
         for script in find_scripts(directory, {}):
             imported = __import__(script.name)
+            feeds_dependencies = {name: calculate_feed_dependencies(desc)
+                                  for name, desc in imported.feeds.iteritems()}
             analytics[script.name] = Analytics(annotations=script.annotations,
                                                feeds=imported.feeds,
-                                               feeds_order=order_feeds(imported.feeds),
+                                               feeds_dependencies=feeds_dependencies,
+                                               feeds_order=order_feeds(imported.feeds, feeds_dependencies),
                                                analyze=imported.analyze)
     return analytics
 
 
-def order_feeds(feeds_dict):
+def order_feeds(feeds_dict, feeds_dependencies):
     feeds = []
-    feeds_dependencies = {name: calculate_feed_dependencies(desc)
-                          for name, desc in feeds_dict.iteritems()}
     for layer in toposort(feeds_dependencies):
         for feed in layer:
             if feed not in feeds_dict:

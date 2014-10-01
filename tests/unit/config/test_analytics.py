@@ -2,7 +2,6 @@
 from __future__ import absolute_import, division, unicode_literals
 
 import operator
-from testfixtures import replace
 import unittest
 
 from themylog.config.analytics import BadParameterArgumentException, order_feeds, calculate_feed_dependencies
@@ -10,18 +9,17 @@ from themylog.rules_tree import Param as P, RecordField as F
 
 
 class OrderFeedsTestCase(unittest.TestCase):
-    dependencies_mock = lambda d: set(d.get("params", []))
-
-    @replace("themylog.config.analytics.calculate_feed_dependencies", dependencies_mock)
     def test_simple_order(self):
         self.assertEqual(order_feeds({"last_sleep_track": {},
-                                      "odometer_logs": {"params": ["last_sleep_track"]}}),
+                                      "odometer_logs": {"params": ["last_sleep_track"]}},
+                                     {"odometer_logs": {"last_sleep_track"}}),
                          ["last_sleep_track", "odometer_logs"])
 
-    @replace("themylog.config.analytics.calculate_feed_dependencies", dependencies_mock)
     def test_raises_bad_parameter_argument_exception(self):
-        self.assertRaises(BadParameterArgumentException, lambda: order_feeds({"last_sleep_track": {},
-                                                                              "odometer_logs": {"params": ["last_sleep_trick"]}}))
+        self.assertRaises(BadParameterArgumentException,
+                          lambda: order_feeds({"last_sleep_track": {},
+                                               "odometer_logs": {"params": ["last_sleep_trick"]}},
+                                              {"odometer_logs": {"last_sleep_trick"}}))
 
 
 
