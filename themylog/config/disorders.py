@@ -1,7 +1,7 @@
-from __future__ import absolute_import
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
 
 import isodate
-
 
 from themylog.annotations.schedule import schedule
 from themylog.annotations.title import title
@@ -17,19 +17,7 @@ def get_disorders(config, handlers):
     disorder_manager = DisorderManager(handlers)
 
     for seeker_config in config_disorders.get("seekers", []):
-        cls = seeker_config["class"]
-        del seeker_config["class"]
-
-        key = seeker_config["title"]
-        del seeker_config["title"]
-
-        if cls == "expect_record":
-            seeker = get_expect_record_disorder_seeker(**seeker_config)
-        elif cls == "record_based":
-            seeker = get_record_based_disorder_seeker(**seeker_config)
-        else:
-            raise NotImplementedError
-
+        key, seeker = get_disorder_seeker(seeker_config)
         disorder_manager.add(key, seeker)
 
     script_disorders = find_scripts(config_disorders.get("directory"), {
@@ -40,11 +28,35 @@ def get_disorders(config, handlers):
     return disorder_manager, script_disorders
 
 
+def get_disorder_seeker(seeker_config):
+    cls = seeker_config["class"]
+    del seeker_config["class"]
+
+    key = seeker_config["title"]
+    del seeker_config["title"]
+
+    if cls == "expect_record":
+        seeker = get_expect_record_disorder_seeker(**seeker_config)
+    elif cls == "group":
+        seeker = get_disorder_seeker_group(**seeker_config)
+    elif cls == "record_based":
+        seeker = get_record_based_disorder_seeker(**seeker_config)
+    else:
+        raise NotImplementedError
+
+    return key, seeker
+
 def get_expect_record_disorder_seeker(**kwargs):
     kwargs["condition"] = get_rules_tree(kwargs["condition"])
     kwargs["interval"] = isodate.parse_duration(kwargs["interval"])
 
     return ExpectRecordSeeker(**kwargs)
+
+
+def get_disorder_seeker_group(**kwargs):
+    kwargs["seekers"] = dict(map(get_disorder_seeker, kwargs["seekers"]))
+
+    return SeekerGroup(**kwargs)
 
 
 def get_record_based_disorder_seeker(**kwargs):

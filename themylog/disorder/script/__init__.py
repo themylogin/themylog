@@ -53,8 +53,7 @@ def setup_script_disorder_seekers(disorder_manager, celery, script_disorders):
 class ScriptSeeker(RecordBasedSeeker):
     def disorder_reason(self, record):
         if record.msg == "disorder_checker_returned_nonzero_exit_code":
-            return "Скрипт вернул код %d:\n%s\n%s" % (record.args["code"], record.args["stdout"],
-                                                        record.args["stderr"])
+            return "Скрипт вернул код %d:\n%s\n%s" % (record.args["code"], record.args["stdout"], record.args["stderr"])
         elif record.msg == "disorder_checker_returned_nothing":
             return "Скрипт не вернул ничего"
         else:

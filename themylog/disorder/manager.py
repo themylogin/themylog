@@ -4,14 +4,13 @@ from __future__ import absolute_import, division, unicode_literals
 from collections import namedtuple, OrderedDict
 from zope.interface import Interface, implements
 
+from themylog.disorder import MaybeDisorder, IDisorderObserver
 from themylog.disorder.seeker.interface import IReplayable
 from themylog.handler.interface import IHandler, IRetrieveCapable
 
-MaybeDisorder = namedtuple("MaybeDisorder", ["is_disorder", "disorder"])
-
 
 class DisorderManager(object):
-    implements(IHandler)
+    implements(IHandler, IDisorderObserver)
 
     def __init__(self, handlers):
         for handler in handlers:
