@@ -219,6 +219,29 @@ Message with value!
 
 Обнаруживаются беспорядки при помощи искателей (seeker), описываемых в секции ``disorders`` конфигурационного файла. В **themylog** встроены несколько шаблонов искателей:
 
+* <a name="disorder-seeker-check_record"></a>**check_record**
+  
+  Этот искатель обнаруживает беспорядок тогда, когда последняя запись, попадающая под критерий, не удовлетворяет некоторому условию. Например:
+
+  ```
+  disorders:
+      seekers:
+          -
+              class: check_record
+              title: "Достаточно места для резервного копирования"
+              condition:
+                  -
+                      application: backup
+                      logger: root
+                      msg: finish
+                      action: accept
+              function: |
+                  from themyutils.file_size import human_bytes
+                  return record.args["free"] > 25e9, "Свободно %s" % human_bytes(record.args["free"])
+  ```
+  
+  Будет создан беспорядок, если после последней выполненной резервной копии на диске осталось свободно менее 25 гигабайт.
+
 * <a name="disorder-seeker-expect_record"></a>**expect_record**
   
   Этот искатель обнаруживает беспорядок тогда, когда в течение указанного периода (задаваемого в формате [ISO8601 Duration](http://en.wikipedia.org/wiki/Iso8601#Durations)) не обнаруживает указанную запись. Например:
@@ -236,6 +259,29 @@ Message with value!
                       msg: finish
                       action: accept
               interval: P1DT6H
+  ```
+
+  Будет создан беспорядок, если за последние 30 часов не было успешно выполнено ни одной резервной копии.
+
+* <a name="disorder-seeker-expect_record"></a>**group**
+  
+  Этот искатель объединяет беспорядки в группы (возможно, вложенные). Например:
+
+  ```
+  disorders:
+      seekers:
+          -
+              class: group
+              title: "Резервное копирование"
+              seekers:
+                  -
+                      class: expect_record
+                      title: "Резервное копирование выполняется"
+                      ...
+                  -
+                      class: check_record
+                      title: "Достаточно места для резервного копирования"
+                      ...
   ```
 
   Будет создан беспорядок, если за последние 30 часов не было успешно выполнено ни одной резервной копии.
