@@ -8,7 +8,7 @@ from themylog.disorder import Disorder, MaybeDisorder, IDisorderObserver
 from themylog.disorder.seeker.abstract import AbstractDisorderSeeker
 from themylog.disorder.seeker.interface import IDisorderSeeker, IReplayable
 
-__all__ = ["SeekerGroup"]
+__all__ = [b"SeekerGroup"]
 
 
 class SeekerGroup(AbstractDisorderSeeker):
