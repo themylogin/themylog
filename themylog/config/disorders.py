@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, unicode_literals
 
+from collections import OrderedDict
 import isodate
 
 from themylog.annotations.schedule import schedule
 from themylog.annotations.title import title
+from themylog.config.function import get_function
 from themylog.config.rules_tree import get_rules_tree
 from themylog.config.scripts import find_scripts
 from themylog.disorder.manager import DisorderManager
@@ -35,16 +37,18 @@ def get_disorder_seeker(seeker_config):
     key = seeker_config["title"]
     del seeker_config["title"]
 
-    if cls == "expect_record":
-        seeker = get_expect_record_disorder_seeker(**seeker_config)
-    elif cls == "group":
-        seeker = get_disorder_seeker_group(**seeker_config)
-    elif cls == "record_based":
-        seeker = get_record_based_disorder_seeker(**seeker_config)
-    else:
-        raise NotImplementedError
+    factory = globals()["get_%s_disorder_seeker" % cls]
+    seeker = factory(**seeker_config)
 
     return key, seeker
+
+
+def get_check_record_disorder_seeker(**kwargs):
+    kwargs["condition"] = get_rules_tree(kwargs["condition"])
+    kwargs["function"] = get_function("record", kwargs["function"])
+
+    return CheckRecordSeeker(**kwargs)
+
 
 def get_expect_record_disorder_seeker(**kwargs):
     kwargs["condition"] = get_rules_tree(kwargs["condition"])
@@ -53,8 +57,8 @@ def get_expect_record_disorder_seeker(**kwargs):
     return ExpectRecordSeeker(**kwargs)
 
 
-def get_disorder_seeker_group(**kwargs):
-    kwargs["seekers"] = dict(map(get_disorder_seeker, kwargs["seekers"]))
+def get_group_disorder_seeker(**kwargs):
+    kwargs["seekers"] = OrderedDict(map(get_disorder_seeker, kwargs["seekers"]))
 
     return SeekerGroup(**kwargs)
 

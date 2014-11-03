@@ -1,8 +1,12 @@
+# -*- coding=utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
+
 import operator
 import unittest
 
 from themylog.config.rules_tree import get_condition_tree
 from themylog.level import levels
+
 
 class FeedConditionPartTestCase(unittest.TestCase):
     def expectResult(self, config_key, config_value, op, record_key, value):

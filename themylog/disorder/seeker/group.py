@@ -15,18 +15,18 @@ class SeekerGroup(AbstractDisorderSeeker):
     implements(IDisorderSeeker, IReplayable)
 
     def __init__(self, seekers):
-        self.seekers = seekers.values()
+        self.seekers = seekers
 
         self.observer = SeekerGroupObserver(self)
-        for key, seeker in seekers.iteritems():
+        for key, seeker in self.seekers.iteritems():
             seeker.add_observer(self.observer, key)
 
     def receive_record(self, record):
-        for seeker in self.seekers:
+        for seeker in self.seekers.values():
             seeker.receive_record(record)
 
     def replay(self, retriever):
-        for seeker in self.seekers:
+        for seeker in self.seekers.values():
             if IReplayable.providedBy(seeker):
                 seeker.replay(retriever)
 
@@ -58,7 +58,8 @@ class SeekerGroupObserver(object):
         reason = []
         data = {}
 
-        for key, maybe in self.disorders.iteritems():
+        for key in self.seeker_group.seekers:
+            maybe = self.disorders.get(key)
             if maybe is None:
                 is_disorder = True
                 disorder_datetime = datetime.now()
@@ -71,7 +72,7 @@ class SeekerGroupObserver(object):
                 else:
                     if no_disorder_datetime is None or no_disorder_datetime < maybe.disorder.datetime:
                         no_disorder_datetime = maybe.disorder.datetime
-                reason.append(maybe)
+                reason.append(dict(maybe._asdict(), title=key))
 
         if is_disorder:
             self.seeker_group.there_is_disorder(Disorder(disorder_datetime, reason, data))

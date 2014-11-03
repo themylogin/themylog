@@ -9,7 +9,7 @@ from themylog.disorder.seeker.abstract import AbstractDisorderSeeker
 from themylog.disorder.seeker.interface import IDisorderSeeker, IReplayable
 from themylog.rules_tree import match_record
 
-__all__ = ["RecordBasedSeeker"]
+__all__ = [b"ExpectRecordSeeker"]
 
 
 class ExpectRecordSeeker(AbstractDisorderSeeker):
