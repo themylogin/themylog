@@ -19,19 +19,22 @@ class Disorder(object):
         self.key = key
 
     def ok(self, explanation, **kwargs):
-        self.log(True, kwargs, explanation)
+        self.state(True, explanation, **kwargs)
 
     def fail(self, explanation, **kwargs):
-        self.log(False, kwargs, explanation)
+        self.state(False, explanation, **kwargs)
 
     def exception(self, explanation, **kwargs):
-        self.log(False, dict(kwargs, exc_info=sys.exc_info()), explanation)
+        self.state(False, explanation, **dict(kwargs, exc_info=sys.exc_info()))
+
+    def state(self, ok, explanation, **kwargs):
+        self.log(ok, kwargs, explanation)
 
     def log(self, ok, args, explanation):
         sys.stdout.write(b"%s\n" % themyutils.json.dumps({"key":         self.key,
                                                           "ok":          ok,
                                                           "args":        args,
-                                                          "explanation": explanation,}))
+                                                          "explanation": explanation}))
 
 
 def setup_script_disorder_seekers(disorder_manager, celery, script_disorders):
