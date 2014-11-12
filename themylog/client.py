@@ -51,7 +51,7 @@ class LoggingHandler(logging.Handler):
                          application=self.application,
                          logger=record.name,
                          level=levels[self._get_level(record)],
-                         msg=self._underscore_message(str(record.msg)),
+                         msg=self._underscore_message(unicode(record.msg)),
                          args=record.__dict__,
                          explanation=self.format(record))
             self.client.log(rec)
