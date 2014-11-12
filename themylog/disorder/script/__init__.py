@@ -61,7 +61,10 @@ class ScriptSeeker(RecordBasedSeeker):
             return "Скрипт не вернул ничего"
         else:
             return [{"is_disorder": not potential_disorder["ok"],
-                     "disorder": "%s: %s" % (potential_disorder["key"], potential_disorder["explanation"])}
+                     "disorder": {"datetime": record.datetime,
+                                  "reason": potential_disorder["explanation"],
+                                  "data": potential_disorder["args"]},
+                     "title": potential_disorder["key"]}
                     for potential_disorder in record.args]
 
 
