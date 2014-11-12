@@ -4,6 +4,8 @@ from __future__ import absolute_import, division, unicode_literals
 from datetime import datetime
 from zope.interface import implements
 
+from themyutils.datetime import russian_strftime
+
 from themylog.disorder import Disorder
 from themylog.disorder.seeker.abstract import AbstractDisorderSeeker
 from themylog.disorder.seeker.interface import IDisorderSeeker, IReplayable
@@ -32,8 +34,7 @@ class ExpectRecordSeeker(AbstractDisorderSeeker):
             self.receive_record(records[0])
 
     def _disorder_reason(self, record):
-        reason = "Последняя запись %s в %s" % (record.datetime.strftime("%d.%m"),
-                                               record.datetime.strftime("%H:%M"))
+        reason = "%s в %s" % (russian_strftime(record.datetime, "%e %B").strip(), record.datetime.strftime("%H:%M"))
         if record.explanation != "":
-            reason += ": «%s»" % record.explanation
+            reason += " " + record.explanation[0].lower() + record.explanation[1:].strip()
         return reason
