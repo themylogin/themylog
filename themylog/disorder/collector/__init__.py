@@ -31,9 +31,12 @@ class CollectorDisorderSeeker(AbstractDisorderSeeker):
             self._handle_record(record)
 
     def replay(self, retriever):
-        records = retriever.retrieve((operator.and_,
-                                         (operator.eq, lambda k: k("application"), "%s.collector" % self.collector.name),
-                                         (operator.ge, lambda k: k("datetime"), datetime.now() - timedelta(hours=24))))
+        records = retriever.retrieve(
+            (operator.and_,
+             (operator.eq, lambda k: k("application"), "%s.collector" % self.collector.name),
+             (operator.and_,
+              (operator.eq, lambda k: k("logger"), "root"),
+              (operator.ge, lambda k: k("datetime"), datetime.now() - timedelta(hours=24)))))
         if records:
             if not any(self._handle_record(record) for record in records):
                 self.there_is_disorder(Disorder(records[0].datetime, None, {"record": records[0]}))
