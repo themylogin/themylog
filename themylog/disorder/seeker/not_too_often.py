@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, unicode_literals
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from datetime import datetime
 import operator
 from pytils.numeral import get_plural
@@ -29,30 +29,42 @@ class NotTooOftenSeeker(AbstractDisorderSeeker):
 
     def receive_record(self, record):
         if match_record(self.condition, record):
-            self.group_to_times[self.group_by(record)].append(record.datetime)
+            self.group_to_times[self.group_by(record)].append(record)
 
-        reason = {}
-        for group, items in self.group_to_times.iteritems():
-            items = filter(lambda d: d > datetime.now() - self.interval, items)
+        reason = OrderedDict()
+        for group, items in sorted(self.group_to_times.iteritems(), key=lambda (g, m): g.lower()
+                                                                                       if isinstance(g, (str, unicode))
+                                                                                       else g):
+            items = filter(lambda record: record.datetime > datetime.now() - self.interval, items)
             self.group_to_times[group] = items
             if len(items) > self.times:
-                reason[group] = MaybeDisorder(True, Disorder(
-                    items[-1],
-                    "Событие произошло %s" % get_plural(len(items), ("раз", "раза", "раз")),
-                    {"count": len(items)}
-                ))
-
-        if reason:
-            if self.group_by:
-                self.there_is_disorder(Disorder(min([maybe.disorder.datetime for maybe in reason.values()]),
-                                                [maybe_with_title(maybe, group)
-                                                 for group, maybe in sorted(reason.iteritems(),
-                                                                            key=lambda (g, m): g.lower())],
-                                                {}))
+                is_disorder = True
+                disorder_datetime = items[self.times].datetime
             else:
-                self.there_is_disorder(reason.values()[0].disorder)
+                is_disorder = False
+                disorder_datetime = items[-1].datetime
+            reason[group] = MaybeDisorder(is_disorder, Disorder(
+                disorder_datetime,
+                "Событие произошло %s" % get_plural(len(items), ("раз", "раза", "раз")),
+                {"records": items}
+            ))
+
+        if any(maybe.is_disorder for maybe in reason.values()):
+            is_disorder = True
+            disorder_datetime = min(maybe.disorder.datetime
+                                    for maybe in reason.values()
+                                    if maybe.is_disorder)
         else:
-            self._state_no_disorder()
+            is_disorder = False
+            disorder_datetime = max(maybe.disorder.datetime for maybe in reason.values())
+        self.state_disorder(is_disorder, Disorder(
+            disorder_datetime,
+            ([maybe_with_title(maybe, group) for group, maybe in reason.iteritems()]
+             if self.group_by else (reason.values()[0].disorder if reason.values() else "Неприятностей не произошло")),
+            {"counts": {group: len(items)
+             for group, items in self.group_to_times.iteritems()}}
+             if self.group_by else {"count": len(self.group_to_times.values()[0])}
+        ))
 
     def replay(self, retriever):
         records = retriever.retrieve((operator.and_,
@@ -62,10 +74,4 @@ class NotTooOftenSeeker(AbstractDisorderSeeker):
             for record in reversed(records):
                 self.receive_record(record)
         else:
-            self._state_no_disorder()
-
-    def _state_no_disorder(self):
-        self.there_is_no_disorder(Disorder(datetime.now(), "Неприятностей не произошло",
-                                               {"counts": {group: len(items)
-                                                           for group, items in self.group_to_times.iteritems()}}
-                                               if self.group_by else {"count": len(self.group_to_times.values()[0])}))
+            self.state_disorder(False, Disorder(datetime.now(), "Неприятностей не произошло", {}))
