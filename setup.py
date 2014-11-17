@@ -15,6 +15,7 @@ setup(
         "celery",
         "isodate",
         "python-dateutil",
+        "pytils",
         "pyyaml",
         "themyutils",
         "threadpool",

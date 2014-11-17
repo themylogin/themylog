@@ -63,6 +63,15 @@ def get_group_disorder_seeker(**kwargs):
     return SeekerGroup(**kwargs)
 
 
+def get_not_too_often_disorder_seeker(**kwargs):
+    kwargs["condition"] = get_rules_tree(kwargs["condition"])
+    kwargs["interval"] = isodate.parse_duration(kwargs["interval"])
+    if "group_by" in kwargs:
+        kwargs["group_by"] = get_function("record", kwargs["group_by"])
+
+    return NotTooOftenSeeker(**kwargs)
+
+
 def get_record_based_disorder_seeker(**kwargs):
     kwargs["right"] = get_rules_tree(kwargs["right"])
     kwargs["wrong"] = get_rules_tree(kwargs["wrong"])
