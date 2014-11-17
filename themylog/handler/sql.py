@@ -134,7 +134,7 @@ class SQL(object):
         return query
 
     def _build_index(self, rules_tree):
-        if rules_tree[0] == operator.or_:
+        if rules_tree[0] == operator.or_ and not any(c is False for c in rules_tree[1:]):
             return None
 
         index = []
@@ -149,4 +149,4 @@ class SQL(object):
             if callable(arg):
                 arg(lambda field: index.append(field) if field in index_columns and field not in index else None)
 
-        return index
+        return sorted(index, key=lambda key: index_columns.index(key))
