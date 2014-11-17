@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, unicode_literals
 from datetime import datetime
 from zope.interface import implements
 
-from themylog.disorder import Disorder, MaybeDisorder, IDisorderObserver
+from themylog.disorder import Disorder, MaybeDisorder, maybe_with_title, IDisorderObserver
 from themylog.disorder.seeker.abstract import AbstractDisorderSeeker
 from themylog.disorder.seeker.interface import IDisorderSeeker, IReplayable
 
@@ -72,7 +72,7 @@ class SeekerGroupObserver(object):
                 else:
                     if no_disorder_datetime is None or no_disorder_datetime < maybe.disorder.datetime:
                         no_disorder_datetime = maybe.disorder.datetime
-                reason.append(dict(maybe._asdict(), title=key))
+                reason.append(maybe_with_title(maybe, key))
 
         if is_disorder:
             self.seeker_group.there_is_disorder(Disorder(disorder_datetime, reason, data))

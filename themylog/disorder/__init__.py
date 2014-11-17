@@ -4,11 +4,15 @@ from __future__ import absolute_import, division, unicode_literals
 from collections import namedtuple
 import zope.interface
 
-__all__ = [b"Disorder", b"MaybeDisorder", b"IDisorderObserver"]
+__all__ = [b"Disorder", b"MaybeDisorder", b"maybe_with_title", b"IDisorderObserver"]
 
 Disorder = namedtuple("Disorder", ["datetime", "reason", "data"])
 
 MaybeDisorder = namedtuple("MaybeDisorder", ["is_disorder", "disorder"])
+
+
+def maybe_with_title(maybe, title):
+    return dict(maybe._asdict(), title=title)
 
 
 class IDisorderObserver(zope.interface.Interface):
