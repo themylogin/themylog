@@ -5,6 +5,7 @@ from datetime import datetime
 from zope.interface import implements
 
 from themyutils.datetime import russian_strftime
+from themyutils.datetime.timedelta import timedelta_in_words
 
 from themylog.disorder import Disorder
 from themylog.disorder.seeker.abstract import AbstractDisorderSeeker
@@ -26,7 +27,8 @@ class ExpectRecordSeeker(AbstractDisorderSeeker):
             if record.datetime >= datetime.now() - self.interval:
                 self.there_is_no_disorder(Disorder(record.datetime, self._disorder_reason(record), {"record": record}))
             else:
-                self.there_is_disorder(Disorder(datetime.now(), self._disorder_reason(record), {"record": record}))
+                p = "Больше, чем %s назад, " % timedelta_in_words(self.interval, 2)
+                self.there_is_disorder(Disorder(datetime.now(), p + self._disorder_reason(record), {"record": record}))
 
     def replay(self, retriever):
         records = retriever.retrieve(self.condition, 1)
