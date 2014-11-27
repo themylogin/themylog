@@ -55,7 +55,7 @@ def create_collector_task(collector, client):
 
                 records.append(Record(datetime=datetime.now(),
                                       application="%s.collector" % collector.name,
-                                      logger="root",
+                                      logger="collector",
                                       level=levels["info"],
                                       msg="completed_successfully",
                                       args={},
@@ -63,7 +63,7 @@ def create_collector_task(collector, client):
             else:
                 records.append(Record(datetime=datetime.now(),
                                       application="%s.collector" % collector.name,
-                                      logger="root",
+                                      logger="collector",
                                       level=levels["error"],
                                       msg="nonzero_exit_code",
                                       args={
@@ -77,7 +77,7 @@ def create_collector_task(collector, client):
             thread.join()
             records.append(Record(datetime=datetime.now(),
                                   application="%s.collector" % collector.name,
-                                  logger="root",
+                                  logger="collector",
                                   level=levels["error"],
                                   msg="timeout",
                                   args={},

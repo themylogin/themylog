@@ -35,7 +35,7 @@ class CollectorDisorderSeeker(AbstractDisorderSeeker):
             (operator.and_,
              (operator.eq, lambda k: k("application"), "%s.collector" % self.collector.name),
              (operator.and_,
-              (operator.eq, lambda k: k("logger"), "root"),
+              (operator.eq, lambda k: k("logger"), "collector"),
               (operator.ge, lambda k: k("datetime"), datetime.now() - timedelta(hours=24)))))
         if records:
             if not any(self._handle_record(record) for record in records):
