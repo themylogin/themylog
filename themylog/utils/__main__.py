@@ -11,28 +11,15 @@ from themylog.analytics import get_analytics_kwargs
 from themylog.client import Client
 from themylog.config import find_config, read_config
 from themylog.config.analytics import get_analytics
-from themylog.config.handlers import create_handlers
 from themylog.config.processors import get_processors
-from themylog.handler.interface import IRetrieveCapable
+from themylog.handler.utils import get_retriever
 from themylog.processor import run_processor
-
-
-def get_retriever(config):
-    handlers = create_handlers(config)
-
-    for handler in handlers:
-        if IRetrieveCapable.providedBy(handler):
-            return handler
-    else:
-        raise Exception("You should have at least one handler that is IRetrieveCapable to run this command")
 
 
 if __name__ == "__main__":
     config = read_config(find_config())
 
     if sys.argv[1] == "run_analytics":
-        handlers = create_handlers(config)
-
         retriever = get_retriever(config)
 
         analytics = get_analytics(config)
@@ -44,8 +31,6 @@ if __name__ == "__main__":
             print("No analytics '%s' exists" % sys.argv[2])
 
     if sys.argv[1] == "run_processor":
-        handlers = create_handlers(config)
-
         retriever = get_retriever(config)
 
         processors = get_processors(config)

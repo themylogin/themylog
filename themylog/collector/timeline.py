@@ -6,8 +6,7 @@ import sys
 
 from themylog.collector.collector import Collector
 from themylog.config import find_config, read_config
-from themylog.config.handlers import create_handlers
-from themylog.handler.interface import IRetrieveCapable
+from themylog.handler.utils import get_retriever
 
 __all__ = ["Timeline"]
 
@@ -19,13 +18,9 @@ class Timeline(Collector):
         self.msg_template = msg_template
 
         config = read_config(find_config())
-        handlers = create_handlers(config)
 
-        for handler in handlers:
-            if IRetrieveCapable.providedBy(handler):
-                self.retriever = handler
-                break
-        else:
+        self.retriever = get_retriever(config)
+        if self.retriever is None:
             raise Exception("You should have at least one handler that is IRetrieveCapable to use Timeline collector")
 
         self.stored_keys = set()

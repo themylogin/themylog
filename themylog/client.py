@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
+
 from datetime import datetime
 import logging
 import re
@@ -5,13 +8,12 @@ import socket
 
 from themylog.config import find_config, read_config
 from themylog.config.receivers import get_receivers
-from themylog.config.handlers import create_handlers
-from themylog.handler.interface import IRetrieveCapable
+from themylog.handler.utils import get_retriever
 from themylog.level import levels
 from themylog.record import Record
 from themylog.record.serializer import serialize_json
 
-__all__ = ["MisconfigurationError", "Client", "LoggingHandler", "setup_logging_handler", "Retriever"]
+__all__ = [b"MisconfigurationError", b"Client", b"LoggingHandler", b"setup_logging_handler", b"Retriever"]
 
 
 class MisconfigurationError(Exception):
@@ -95,11 +97,8 @@ class Retriever(object):
     def __init__(self, config=None):
         config = read_config(config or find_config())
 
-        for handler in create_handlers(config):
-            if IRetrieveCapable.providedBy(handler):
-                self.retriever = handler
-                break
-        else:
+        self.retriever = get_retriever(config)
+        if self.retriever is None:
             raise MisconfigurationError("You should have at least one handler that is IRetrieveCapable to use Retriever")
 
     def retrieve(self, *args, **kwargs):
