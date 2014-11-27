@@ -10,3 +10,8 @@ try:
     from themylog.handler.sql import *
 except ImportError:
     pass
+
+try:
+    from themylog.handler.sentry import *
+except ImportError:
+    pass

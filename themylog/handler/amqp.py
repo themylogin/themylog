@@ -1,4 +1,5 @@
-from __future__ import absolute_import
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
 
 import logging
 import pika
@@ -11,7 +12,7 @@ from themylog.feed import IFeedsAware
 from themylog.record.serializer import serialize_json
 from themylog.handler.interface import IHandler
 
-__all__ = ["AMQP"]
+__all__ = [b"AMQP"]
 
 logger = logging.getLogger(__name__)
 logging.getLogger("pika").setLevel(logging.WARNING)
@@ -56,9 +57,9 @@ class AMQP(object):
                 connection = pika.BlockingConnection()
 
                 channel = connection.channel()
-                channel.exchange_declare(self.exchange, type="topic")
+                channel.exchange_declare(self.exchange, exchange_type="topic")
                 for feed_name in self.feeds:
-                    channel.exchange_declare("%s.%s" % (self.exchange, feed_name), type="topic")
+                    channel.exchange_declare("%s.%s" % (self.exchange, feed_name), exchange_type="topic")
 
                 while True:
                     connection.process_data_events()

@@ -1,0 +1,80 @@
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
+
+from django.conf import settings
+import logging
+import os
+from Queue import Queue
+from raven import Client
+from threading import Thread
+import time
+from zope.interface import implements
+
+from themylog.config.rules_tree import get_rules_tree
+from themylog.handler.interface import IHandler
+from themylog.rules_tree import match_record
+
+__all__ = [b"Sentry"]
+
+
+logger = logging.getLogger(__name__)
+
+
+class Sentry(object):
+    implements(IHandler)
+
+    def __init__(self, team, owner, rules_tree):
+        config_file = os.path.expanduser("~/.sentry/sentry.conf.py")
+        config = {b"__file__": config_file}
+        execfile(config_file, config)
+        settings.configure(**{k: v for k, v in config.iteritems()
+                              if k in ["DATABASES"] or any(k.startswith("%s_" % s)
+                                                           for s in ["AUTH", "SENTRY"])})
+
+        from sentry.models import Team, Project, ProjectKey, User
+        self.Project = Project
+        self.ProjectKey = ProjectKey
+
+        self.team = Team.objects.get(name=team)
+        self.owner = User.objects.get(username=owner)
+        self.projects = {}
+
+        self.rules_tree = get_rules_tree(rules_tree)
+
+        self.publish_queue = Queue()
+
+        self.persister_thread = Thread(target=self._persister_thread)
+        self.persister_thread.daemon = True
+        self.persister_thread.start()
+
+    def handle(self, record):
+        if match_record(self.rules_tree, record):
+            self.publish_queue.put(record)
+
+    def _persister_thread(self):
+        while True:
+            try:
+                while True:
+                    record = self.publish_queue.get()
+                    try:
+                        dsn = self.projects.get(record.application)
+                        if dsn is None:
+                            project = self.Project.objects.get_or_create(team=self.team, owner=self.owner,
+                                                                         name=record.application)[0]
+                            dsn = self.ProjectKey.objects.get(project=project).get_dsn()
+                            self.projects[record.application] = dsn
+
+                        client = Client(dsn)
+                        client.capture("raven.events.Message",
+                                       message=record.msg,
+                                       formatted=record.explanation or record.msg,
+                                       data={"logger": record.logger},
+                                       date=record.datetime,
+                                       extra=record._asdict())
+                    except:
+                        self.publish_queue.put(record)
+                        raise
+
+            except:
+                logger.exception("An exception occurred in persister thread")
+                time.sleep(5)
