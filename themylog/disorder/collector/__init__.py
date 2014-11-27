@@ -27,7 +27,7 @@ class CollectorDisorderSeeker(AbstractDisorderSeeker):
         self.last_success = None
 
     def receive_record(self, record):
-        if record.application == "%s.collector" % self.collector.name:
+        if record.application == "%s.collector" % self.collector.name and record.logger == "collector":
             self._handle_record(record)
 
     def replay(self, retriever):
