@@ -56,7 +56,7 @@ class NotTooOftenSeeker(AbstractDisorderSeeker):
                                     if maybe.is_disorder)
         else:
             is_disorder = False
-            disorder_datetime = max(maybe.disorder.datetime for maybe in reason.values())
+            disorder_datetime = max(maybe.disorder.datetime for maybe in reason.values()) if reason else datetime.now()
         self.state_disorder(is_disorder, Disorder(
             disorder_datetime,
             ([maybe_with_title(maybe, group) for group, maybe in reason.iteritems()]
