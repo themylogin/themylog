@@ -1,18 +1,20 @@
-from __future__ import absolute_import
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, unicode_literals
 
 import logging
 import os
 from Queue import Queue
 import SocketServer
 from threading import Thread
+import time
 from zope.interface import implements
 
 from themylog.receiver.interface import IReceiver
 from themylog.record.parser import parse_json, parse_plaintext
 
-__all__ = ["TCPServer", "UDPServer"]
-if hasattr(SocketServer, "UnixStreamServer"):
-    __all__.extend(["UnixServer"])
+__all__ = [b"TCPServer", b"UDPServer"]
+if hasattr(SocketServer, b"UnixStreamServer"):
+    __all__.extend([b"UnixServer"])
 
 
 class StreamSocketServerHandler(SocketServer.BaseRequestHandler):
@@ -25,7 +27,7 @@ class StreamSocketServerHandler(SocketServer.BaseRequestHandler):
         if isinstance(request, tuple):
             recv = request[0]
         else:
-            recv = ""
+            recv = b""
             while True:
                 data = request.recv(1024)
                 if not data:
@@ -76,10 +78,25 @@ class UDPServer(StreamSocketServer):
         super(UDPServer, self).__init__(format, SocketServer.ThreadingUDPServer, (host, port))
 
 
-if hasattr(SocketServer, "ThreadingUnixStreamServer"):
+if hasattr(SocketServer, b"ThreadingUnixStreamServer"):
     class UnixServer(StreamSocketServer):
-        def __init__(self, path, format="json"):
+        def __init__(self, path, fallback=None, format="json"):
             if os.path.exists(path):
                 os.unlink(path)
 
+            if fallback:
+                fallback_thread = Thread(target=self.run_fallback_thread, args=(fallback,))
+                fallback_thread.daemon = True
+                fallback_thread.start()
+
             super(UnixServer, self).__init__(format, SocketServer.ThreadingUnixStreamServer, path)
+
+        def run_fallback_thread(self, fallback):
+            while True:
+                for message_file in os.listdir(fallback):
+                    path = os.path.join(fallback, message_file)
+                    if os.path.getmtime(path) > time.time() - 1:
+                        self.server.queue.put(("", open(path, "r").read()))
+                        os.unlink(path)
+
+                time.sleep(1)

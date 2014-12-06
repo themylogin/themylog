@@ -3,8 +3,11 @@ from __future__ import absolute_import, division, unicode_literals
 
 from datetime import datetime
 import logging
+import os
 import re
 import socket
+import time
+import uuid
 
 from themylog.config import find_config, read_config
 from themylog.config.receivers import get_receivers
@@ -27,15 +30,25 @@ class Client(object):
         for receiver in get_receivers(config):
             if receiver.class_ == "UnixServer" and receiver.args.get("format", "json") == "json":
                 self.unix_socket = receiver.args["path"]
+                self.fallback = receiver.args.get("fallback")
                 break
         else:
             raise MisconfigurationError("No UnixServer receiver that accepts json found in %s" % config)
 
     def log(self, record):
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.connect(self.unix_socket)
-        s.send(serialize_json(record))
-        s.close()
+        data = serialize_json(record)
+
+        try:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.connect(self.unix_socket)
+            s.send(data)
+            s.close()
+        except socket.error:
+            if self.fallback:
+                with open(os.path.join(self.fallback, "%f-%s.json" % (time.time(), uuid.uuid4())), "w") as f:
+                    f.write(data)
+            else:
+                raise
 
 
 class LoggingHandler(logging.Handler):
