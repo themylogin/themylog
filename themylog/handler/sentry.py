@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class Sentry(object):
     implements(IHandler)
 
-    def __init__(self, team, owner, rules_tree):
+    def __init__(self, team, organization, rules_tree):
         config_file = os.path.expanduser("~/.sentry/sentry.conf.py")
         config = {b"__file__": config_file}
         execfile(config_file, config)
@@ -31,12 +31,12 @@ class Sentry(object):
                               if k in ["DATABASES"] or any(k.startswith("%s_" % s)
                                                            for s in ["AUTH", "SENTRY"])})
 
-        from sentry.models import Team, Project, ProjectKey, User
+        from sentry.models import Team, Project, ProjectKey, Organization
         self.Project = Project
         self.ProjectKey = ProjectKey
 
         self.team = Team.objects.get(name=team)
-        self.owner = User.objects.get(username=owner)
+        self.organization = Organization.objects.get(name=organization)
         self.projects = {}
 
         self.rules_tree = get_rules_tree(rules_tree)
@@ -59,7 +59,7 @@ class Sentry(object):
                     try:
                         dsn = self.projects.get(record.application)
                         if dsn is None:
-                            project = self.Project.objects.get_or_create(team=self.team, owner=self.owner,
+                            project = self.Project.objects.get_or_create(team=self.team, organization=self.organization,
                                                                          name=record.application)[0]
                             dsn = self.ProjectKey.objects.get(project=project).get_dsn()
                             self.projects[record.application] = dsn
