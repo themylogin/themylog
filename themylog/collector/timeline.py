@@ -29,11 +29,14 @@ class Timeline(Collector):
         if key in self.stored_keys:
             return True
 
-        return len(self.retriever.retrieve((operator.and_,
+        return len(self.retrieve(key)) > 0
+
+    def retrieve(self, key):
+        return self.retriever.retrieve((operator.and_,
                                                (operator.eq, lambda k: k("application"), self.application),
                                                (operator.and_,
                                                    (operator.eq, lambda k: k("logger"), self.logger),
-                                                   (operator.eq, lambda k: k("msg"), self.msg_template % key))), 1)) > 0
+                                                   (operator.eq, lambda k: k("msg"), self.msg_template % key))), 1)
 
     def store(self, key, args, **kwargs):
         self.stored_keys.add(key)
