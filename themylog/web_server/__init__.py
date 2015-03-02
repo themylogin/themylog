@@ -157,7 +157,7 @@ class WebApplication(object):
 
         if "wsgi.websocket" in request.environ:
             queue = Queue()
-            async = self.gevent.get_hub().loop.async()
+            async = self._create_async()
             self.queues.add((queue, async))
 
             ws = request.environ["wsgi.websocket"]
@@ -200,7 +200,7 @@ class WebApplication(object):
     def execute_disorders(self, request):
         if "wsgi.websocket" in request.environ:
             queue = Queue()
-            async = self.gevent.get_hub().loop.async()
+            async = self._create_async()
             self.disorder_queues.add((queue, async))
 
             ws = request.environ["wsgi.websocket"]
@@ -252,7 +252,7 @@ class WebApplication(object):
 
         if "wsgi.websocket" in request.environ:
             queue = Queue()
-            async = self.gevent.get_hub().loop.async()
+            async = self._create_async()
             self.queues.add((queue, async))
 
             ws = request.environ["wsgi.websocket"]
@@ -300,3 +300,8 @@ class WebApplication(object):
             return Response()
         else:
             return Response(themyutils.json.dumps(analytics.analyze(**kwargs)), mimetype="application/json")
+
+    def _create_async(self):
+        async = self.gevent.get_hub().loop.async()
+        async.start(lambda: None)
+        return async
