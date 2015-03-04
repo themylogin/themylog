@@ -164,9 +164,12 @@ class WebApplication(object):
 
             last_record = None
             try:
-                for record in reversed(records):
-                    ws.send(serialize_one(record))
-                    last_record = record
+                if records:
+                    for record in reversed(records):
+                        ws.send(serialize_one(record))
+                        last_record = record
+                else:
+                    ws.send("null")
 
                 while True:
                     self.gevent.get_hub().wait(async)
