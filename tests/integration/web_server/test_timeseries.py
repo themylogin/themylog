@@ -44,6 +44,15 @@ class TimeseriesTestCase(WebserverTestCase):
         self.assertEqual(len(reader), 1)
         self.assertEqual(reader[-1], {"movie": "Life.Cycles.mkv"})
 
-        time.sleep(2)
+        time.sleep(3)
         self.assertEqual(len(reader), 2)
+        self.assertEqual(reader[-1], None)
+
+    def test_websocket_first_receives_null_if_nothing_available_within_timeout(self):
+        self.start(self.config)
+
+        reader = self.websocketReader("/timeseries/theMediaShell?timeout=2")
+
+        time.sleep(0.5)
+        self.assertEqual(len(reader), 1)
         self.assertEqual(reader[-1], None)
