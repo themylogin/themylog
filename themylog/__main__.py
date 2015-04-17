@@ -27,6 +27,7 @@ from themylog.disorder.collector import setup_collector_disorder_seekers
 from themylog.disorder.script import setup_script_disorder_seekers
 from themylog.feed import IFeedsAware
 from themylog.processor import run_processor
+from themylog.utils.worker_pool import WorkerPool
 from themylog.web_server import setup_web_server
 
 if __name__ == "__main__":
@@ -124,6 +125,7 @@ if __name__ == "__main__":
     logger.info("Setting up processors")
 
     processors = get_processors(config)
+    processors_pool = WorkerPool("processors")
 
     logger.info("Starting scheduler")
 
@@ -146,6 +148,6 @@ if __name__ == "__main__":
         for handler in handlers:
             handler.handle(record)
 
-        for processor in processors:
-            for result in run_processor(processor, record):
-                record_queue.put(result)
+        processors_pool.run(lambda: [[record_queue.put(result)
+                                      for result in run_processor(processor, record)]
+                                     for processor in processors])

@@ -13,6 +13,8 @@ setup(
     long_description=open('README.md').read(),
     install_requires=[
         "celery",
+        "gevent",
+        "gevent-websocket",
         "isodate",
         "python-dateutil",
         "pytils",
