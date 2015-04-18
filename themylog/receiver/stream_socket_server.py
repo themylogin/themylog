@@ -5,9 +5,10 @@ import logging
 import os
 from Queue import Queue
 import SocketServer
-from threading import Thread
 import time
 from zope.interface import implements
+
+from themyutils.threading import start_daemon_thread
 
 from themylog.receiver.interface import IReceiver
 from themylog.record.parser import parse_json, parse_plaintext
@@ -15,6 +16,8 @@ from themylog.record.parser import parse_json, parse_plaintext
 __all__ = [b"TCPServer", b"UDPServer"]
 if hasattr(SocketServer, b"UnixStreamServer"):
     __all__.extend([b"UnixServer"])
+
+logger = logging.getLogger(__name__)
 
 
 class StreamSocketServerHandler(SocketServer.BaseRequestHandler):
@@ -42,6 +45,8 @@ class StreamSocketServer(object):
     implements(IReceiver)
 
     def __init__(self, format, server_factory, server_address):
+        self.logger = logger.getChild("%r" % (server_address,))
+
         self.format = format
         try:
             self.parse = {
@@ -54,9 +59,7 @@ class StreamSocketServer(object):
         self.server = server_factory(server_address, StreamSocketServerHandler)
         self.server.queue = Queue()
 
-        self.server_thread = Thread(target=self.server.serve_forever)
-        self.server_thread.daemon = True
-        self.server_thread.start()
+        start_daemon_thread(self.server.serve_forever)
 
     def receive(self):
         while True:
@@ -65,7 +68,7 @@ class StreamSocketServer(object):
             try:
                 yield self.parse(address, text)
             except (TypeError, ValueError):
-                logging.exception("Unable to parse following message from %r: %s", address, text)
+                self.logger.exception("Unable to parse following message from %r: %s", address, text)
 
 
 class TCPServer(StreamSocketServer):
@@ -85,9 +88,7 @@ if hasattr(SocketServer, b"ThreadingUnixStreamServer"):
                 os.unlink(path)
 
             if fallback:
-                fallback_thread = Thread(target=self.run_fallback_thread, args=(fallback,))
-                fallback_thread.daemon = True
-                fallback_thread.start()
+                start_daemon_thread(self.run_fallback_thread, fallback)
 
             super(UnixServer, self).__init__(format, SocketServer.ThreadingUnixStreamServer, path)
 
@@ -95,7 +96,7 @@ if hasattr(SocketServer, b"ThreadingUnixStreamServer"):
             while True:
                 for message_file in os.listdir(fallback):
                     path = os.path.join(fallback, message_file)
-                    if os.path.getmtime(path) > time.time() - 1:
+                    if os.path.getmtime(path) < time.time() - 1:
                         self.server.queue.put(("", open(path, "r").read()))
                         os.unlink(path)
 
