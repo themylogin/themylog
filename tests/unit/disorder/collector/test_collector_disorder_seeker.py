@@ -22,6 +22,7 @@ class CollectorDisorderTestCase(DisorderSeekerAbstractTestCase):
     def fake_good_record(self, **kwargs):
         record_kwargs = dict(datetime=datetime.now(),
                              application="script.collector",
+                             logger="collector",
                              level=levels["info"])
         record_kwargs.update(**kwargs)
         return self.fake_record(**record_kwargs)
@@ -29,6 +30,7 @@ class CollectorDisorderTestCase(DisorderSeekerAbstractTestCase):
     def fake_bad_record(self, **kwargs):
         record_kwargs = dict(datetime=datetime.now(),
                              application="script.collector",
+                             logger="collector",
                              level=levels["error"])
         record_kwargs.update(**kwargs)
         return self.fake_record(**record_kwargs)
