@@ -97,7 +97,7 @@ class SQL(object):
         return map(lambda record: Record(**{k: getattr(record, k) for k in Record._fields}), records)
 
     def cleanup(self, rules_tree, older_than):
-        self._create_query(rules_tree).filter(SQLRecord.datetime < older_than).delete()
+        self._create_query(rules_tree).filter(SQLRecord.datetime < older_than).delete(synchronize_session=False)
 
     def _persister_thread(self):
         while True:
