@@ -179,9 +179,14 @@ class WebApplication(object):
                     while not queue.empty():
                         record = queue.get()
                         if rules_tree is None or match_record(rules_tree, record):
-                            if not expires or record.datetime > expires:
-                                ws.send(serialize_one(record))
-                                last_record = record
+                            if last_record and record.datetime < last_record.datetime:
+                                continue
+
+                            if expires and record.datetime < expires:
+                                continue
+
+                            ws.send(serialize_one(record))
+                            last_record = record
 
                     if (limit == 1 and
                             expires and
