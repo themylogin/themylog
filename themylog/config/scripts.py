@@ -15,6 +15,7 @@ def find_scripts(directory, annotation_parsers):
         for script in os.listdir(directory):
             path = os.path.join(directory, script)
             name, ext = os.path.splitext(script)
+            name = name.rstrip("_")
 
             if ext != ".py":
                 continue
