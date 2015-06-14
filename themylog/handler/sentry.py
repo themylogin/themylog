@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, unicode_literals
 
 from django.conf import settings
+from django.db import connection
 import logging
 import os
 from Queue import Queue
@@ -77,5 +78,16 @@ class Sentry(object):
                         raise
 
             except:
-                logger.exception("An exception occurred in persister thread")
+                logger.error("An exception occurred in persister thread", exc_info=True)
+
+                try:
+                    connection.connection.close()
+                except:
+                    logger.info("Unable to close connection", exc_info=True)
+
+                try:
+                    connection.connection = None
+                except:
+                    logger.info("Unable to set connection to None", exc_info=True)
+
                 time.sleep(5)
