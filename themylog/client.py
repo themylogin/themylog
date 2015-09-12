@@ -72,7 +72,7 @@ class LoggingHandler(logging.Handler):
             self.client.log(rec)
         except (KeyboardInterrupt, SystemExit):
             raise
-        except:
+        except Exception:
             self.handleError(record)
 
     def _get_level(self, record):

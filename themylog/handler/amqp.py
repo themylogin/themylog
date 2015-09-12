@@ -68,12 +68,12 @@ class AMQP(object):
                         kwargs = self.publish_queue.get()
                         try:
                             channel.basic_publish(**kwargs)
-                        except:
+                        except Exception:
                             self.publish_queue.put(kwargs)
                             raise
 
                     time.sleep(0.01)
 
-            except:
+            except Exception:
                 logger.exception("An exception occurred in persister thread")
                 time.sleep(5)

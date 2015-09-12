@@ -73,21 +73,21 @@ class Sentry(object):
                                        data={"logger": record.logger},
                                        date=record.datetime,
                                        extra=record._asdict())
-                    except:
+                    except Exception:
                         self.publish_queue.put(record)
                         raise
 
-            except:
+            except Exception:
                 logger.error("An exception occurred in persister thread", exc_info=True)
 
                 try:
                     connection.connection.close()
-                except:
+                except Exception:
                     logger.info("Unable to close connection", exc_info=True)
 
                 try:
                     connection.connection = None
-                except:
+                except Exception:
                     logger.info("Unable to set connection to None", exc_info=True)
 
                 time.sleep(5)

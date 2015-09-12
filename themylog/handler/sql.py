@@ -79,7 +79,7 @@ class SQL(object):
 
         try:
             Base.metadata.create_all(create_engine(self.dsn))
-        except:
+        except Exception:
             logger.exception("An exception occurred while issuing Base.metadata.create_all")
 
         self.persister_thread = Thread(target=self._persister_thread)
@@ -108,11 +108,11 @@ class SQL(object):
                     query = self.query_queue.get()
                     try:
                         session.execute(query)
-                    except:
+                    except Exception:
                         self.query_queue.put(query)
                         raise
 
-            except:
+            except Exception:
                 logger.exception("An exception occurred in persister thread")
                 time.sleep(5)
 

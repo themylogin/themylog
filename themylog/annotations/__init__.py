@@ -49,7 +49,7 @@ def read_annotations(code, annotation_parsers):
 
         try:
             tree = ast.parse(line.lstrip("# "))
-        except:
+        except Exception:
             continue
 
         for key, parser in annotation_parsers.items():

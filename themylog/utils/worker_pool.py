@@ -38,7 +38,7 @@ class WorkerPool(object):
 
             try:
                 task()
-            except:
+            except Exception:
                 self.logger.exception("Exception in worker_pool")
 
             with self.workers_lock:

@@ -11,7 +11,7 @@ from themylog.record import Record
 def run_processor(processor, record):
     try:
         result = processor.process(record)
-    except:
+    except Exception:
         return [Record(application="%s.processor" % processor.name,
                        logger="root",
                        datetime=datetime.now(),
