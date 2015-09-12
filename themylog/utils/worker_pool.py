@@ -39,7 +39,7 @@ class WorkerPool(object):
             try:
                 task()
             except Exception:
-                self.logger.exception("Exception in worker_pool")
+                self.logger.error("Exception in worker_pool", exc_info=True)
 
             with self.workers_lock:
                 self.busy_workers -= 1

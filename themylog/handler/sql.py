@@ -4,21 +4,19 @@ from __future__ import absolute_import, division, unicode_literals
 from itertools import combinations
 import logging
 import operator
-from Queue import Queue
 from sqlalchemy import create_engine
 from sqlalchemy import Column, Index
 from sqlalchemy import BigInteger, DateTime, Integer, PickleType, String, Text
 from sqlalchemy import literal
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import create_session
-from threading import Thread
-import time
 from zope.interface import implements
 
 import themyutils.json
 
 from themylog.rules_tree.evaluator import Evaluator
 from themylog.record import Record
+from themylog.handler.base import BaseHandler
 from themylog.handler.interface import IHandler, IRetrieveCapable, ICleanupCapable
 
 __all__ = [b"SQL"]
@@ -56,13 +54,11 @@ class SQLRecord(Base):
     )
 
 
-class SQL(object):
+class SQL(BaseHandler):
     implements(IHandler, IRetrieveCapable, ICleanupCapable)
 
     def __init__(self, dsn):
         self.dsn = dsn
-
-        self.query_queue = Queue()
 
         self.rules_tree_evaluator = Evaluator(
             lambda key: getattr(SQLRecord, key),
@@ -80,14 +76,15 @@ class SQL(object):
         try:
             Base.metadata.create_all(create_engine(self.dsn))
         except Exception:
-            logger.exception("An exception occurred while issuing Base.metadata.create_all")
+            logger.error("An exception occurred while issuing Base.metadata.create_all", exc_info=True)
 
-        self.persister_thread = Thread(target=self._persister_thread)
-        self.persister_thread.daemon = True
-        self.persister_thread.start()
+        super(SQL, self).__init__()
 
-    def handle(self, record):
-        self.query_queue.put(SQLRecord.__table__.insert().values(**record._asdict()))
+    def initialize(self):
+        self.session = self._create_session()
+
+    def process(self, record):
+        self.session.execute(SQLRecord.__table__.insert().values(**record._asdict()))
 
     def retrieve(self, rules_tree, limit=None):
         records = self._create_query(rules_tree).order_by(SQLRecord.datetime.desc())
@@ -98,23 +95,6 @@ class SQL(object):
 
     def cleanup(self, rules_tree, older_than):
         self._create_query(rules_tree).filter(SQLRecord.datetime < older_than).delete(synchronize_session=False)
-
-    def _persister_thread(self):
-        while True:
-            try:
-                session = self._create_session()
-
-                while True:
-                    query = self.query_queue.get()
-                    try:
-                        session.execute(query)
-                    except Exception:
-                        self.query_queue.put(query)
-                        raise
-
-            except Exception:
-                logger.exception("An exception occurred in persister thread")
-                time.sleep(5)
 
     def _create_session(self):
         return create_session(create_engine(self.dsn))

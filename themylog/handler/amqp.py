@@ -3,14 +3,12 @@ from __future__ import absolute_import, division, unicode_literals
 
 import logging
 import pika
-from Queue import Queue
-from threading import Thread
-import time
+from threading import Lock
 from zope.interface import implements
 
-from themylog.feed import IFeedsAware
+from themylog.handler.base import BaseHandler
 from themylog.record.serializer import serialize_json
-from themylog.handler.interface import IHandler
+from themylog.handler.interface import IHandler, IRequiresHeartbeat
 
 __all__ = [b"AMQP"]
 
@@ -18,62 +16,34 @@ logger = logging.getLogger(__name__)
 logging.getLogger("pika").setLevel(logging.WARNING)
 
 
-class AMQP(object):
-    implements(IHandler, IFeedsAware)
+class AMQP(BaseHandler):
+    implements(IHandler, IRequiresHeartbeat)
 
     def __init__(self, exchange):
         self.exchange = exchange
 
-        self.publish_queue = Queue()
+        self.connection = None
+        self.connection_lock = Lock()
+        self.channel = None
 
-    def set_feeds(self, feeds):
-        self.feeds = feeds
+        super(AMQP, self).__init__()
 
-        self.persister_thread = Thread(target=self._persister_thread)
-        self.persister_thread.daemon = True
-        self.persister_thread.start()
+    def initialize(self):
+        with self.connection_lock:
+            self.connection = pika.BlockingConnection()
 
-    def handle(self, record):
-        routing_key = ("%s.%s.%s" % (record.application, record.logger, record.msg))[:128]
-        body = serialize_json(record)
+            self.channel = self.connection.channel()
+            self.channel.exchange_declare(self.exchange, exchange_type="topic")
 
-        self.publish_queue.put({
-            "exchange": self.exchange,
-            "routing_key": routing_key,
-            "body": body,
-        })
+    def process(self, record):
+        with self.connection_lock:
+            self.channel.basic_publish(exchange=self.exchange,
+                                       routing_key=("%s.%s.%s" % (record.application, record.logger, record.msg))[:128],
+                                       body=serialize_json(record))
 
-        for feed_name, feed in self.feeds.items():
-            if feed.contains(record):
-                self.publish_queue.put({
-                    "exchange": "%s.%s" % (self.exchange, feed_name),
-                    "routing_key": routing_key,
-                    "body": body,
-                })
-
-    def _persister_thread(self):
-        while True:
+    def heartbeat(self):
+        with self.connection_lock:
             try:
-                connection = pika.BlockingConnection()
-
-                channel = connection.channel()
-                channel.exchange_declare(self.exchange, exchange_type="topic")
-                for feed_name in self.feeds:
-                    channel.exchange_declare("%s.%s" % (self.exchange, feed_name), exchange_type="topic")
-
-                while True:
-                    connection.process_data_events()
-
-                    if not self.publish_queue.empty():
-                        kwargs = self.publish_queue.get()
-                        try:
-                            channel.basic_publish(**kwargs)
-                        except Exception:
-                            self.publish_queue.put(kwargs)
-                            raise
-
-                    time.sleep(0.01)
-
+                self.connection.process_data_events()
             except Exception:
-                logger.exception("An exception occurred in persister thread")
-                time.sleep(5)
+                logger.error("Exception when calling process_data_events")
