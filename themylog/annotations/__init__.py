@@ -26,6 +26,8 @@ def value_annotation(tree, name, type):
         isinstance(tree.body[0].targets[0], ast.Name) and tree.body[0].targets[0].id == name):
         if isinstance(tree.body[0].value, type):
             return _ast_value(tree.body[0].value)
+        if isinstance(tree.body[0].value, ast.Name) and tree.body[0].value.id in ["True", "False"]:
+            return {"True": True, "False": False}[tree.body[0].value.id]
         if isinstance(tree.body[0].value, ast.Name) and tree.body[0].value.id == "None":
             return NoneValue
 

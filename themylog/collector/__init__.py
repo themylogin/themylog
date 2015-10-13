@@ -41,18 +41,24 @@ def create_collector_task(collector, client):
 
         thread.join(collector.annotations.get("timeout", 60))
         if not thread.is_alive():
-            if p.returncode == 0:
+            if p.returncode == 0 or not collector.annotations.get("transactional", False):
                 stdout = stdout_stderr[0].strip()
                 if stdout:
-                    for data in map(themyutils.json.loads, stdout.split("\n")):
-                        records.append(Record(datetime=data["datetime"],
-                                              application=collector.name,
-                                              logger=data["logger"],
-                                              level=levels[data["level"]],
-                                              msg=data["msg"],
-                                              args=data["args"],
-                                              explanation=data["explanation"]))
+                    for data in stdout.split("\n"):
+                        try:
+                            data = themyutils.json.loads(data)
+                        except Exception:
+                            pass
+                        else:
+                            records.append(Record(datetime=data["datetime"],
+                                                  application=collector.name,
+                                                  logger=data["logger"],
+                                                  level=levels[data["level"]],
+                                                  msg=data["msg"],
+                                                  args=data["args"],
+                                                  explanation=data["explanation"]))
 
+            if p.returncode == 0:
                 records.append(Record(datetime=datetime.now(),
                                       application="%s.collector" % collector.name,
                                       logger="collector",

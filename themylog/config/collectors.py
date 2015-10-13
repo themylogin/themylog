@@ -5,6 +5,7 @@ from themylog.annotations.allowed_downtime import allowed_downtime
 from themylog.annotations.schedule import schedule
 from themylog.annotations.title import title
 from themylog.annotations.timeout import timeout
+from themylog.annotations.transactional import transactional
 from themylog.config.scripts import find_scripts
 
 
@@ -14,4 +15,5 @@ def get_collectors(config):
         "schedule":             schedule,
         "title":                title,
         "timeout":              timeout,
+        "transactional":        transactional,
     })
