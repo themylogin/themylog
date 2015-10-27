@@ -81,19 +81,19 @@ class WebApplication(object):
                                         self.wsgi_app, handler_class=WebSocketHandler).serve_forever()
 
     def handle(self, record):
-        for queue, async in self.queues.copy():
+        for queue, waiter in self.queues.copy():
             queue.put(record)
-            async.send()
+            waiter.send()
+
+    def heartbeat(self):
+        for queue, waiter in self.queues.copy():
+            waiter.send()
 
     def update_disorders(self, disorders):
         self.disorders = disorders
-        for queue, async in self.disorder_queues.copy():
+        for queue, waiter in self.disorder_queues.copy():
             queue.put(disorders)
-            async.send()
-
-    def heartbeat(self):
-        for queue, async in self.queues.copy():
-            async.send()
+            waiter.send()
 
     def wsgi_app(self, environ, start_response):
         request = Request(environ)
@@ -157,8 +157,8 @@ class WebApplication(object):
 
         if "wsgi.websocket" in request.environ:
             queue = Queue()
-            async = self._create_async()
-            self.queues.add((queue, async))
+            waiter = self._create_waiter()
+            self.queues.add((queue, waiter))
 
             ws = request.environ["wsgi.websocket"]
 
@@ -173,7 +173,7 @@ class WebApplication(object):
                         ws.send("null")
 
                 while True:
-                    self.gevent.get_hub().wait(async)
+                    self._wait(waiter)
 
                     expires = datetime.now() - timedelta(seconds=timeout) if timeout else None
                     while not queue.empty():
@@ -197,7 +197,7 @@ class WebApplication(object):
             except self.WebSocketError:
                 pass
             finally:
-                self.queues.remove((queue, async))
+                self.queues.remove((queue, waiter))
 
                 if not ws.closed:
                     ws.close()
@@ -209,8 +209,8 @@ class WebApplication(object):
     def execute_disorders(self, request):
         if "wsgi.websocket" in request.environ:
             queue = Queue()
-            async = self._create_async()
-            self.disorder_queues.add((queue, async))
+            waiter = self._create_waiter()
+            self.disorder_queues.add((queue, waiter))
 
             ws = request.environ["wsgi.websocket"]
 
@@ -218,14 +218,14 @@ class WebApplication(object):
                 ws.send(self.serialize_disorders(self.disorders))
 
                 while True:
-                    self.gevent.get_hub().wait(async)
+                    self._wait(waiter)
 
                     while not queue.empty():
                         ws.send(self.serialize_disorders(queue.get()))
             except self.WebSocketError:
                 pass
             finally:
-                self.disorder_queues.remove((queue, async))
+                self.disorder_queues.remove((queue, waiter))
 
                 if not ws.closed:
                     ws.close()
@@ -261,8 +261,8 @@ class WebApplication(object):
 
         if "wsgi.websocket" in request.environ:
             queue = Queue()
-            async = self._create_async()
-            self.queues.add((queue, async))
+            waiter = self._create_waiter()
+            self.queues.add((queue, waiter))
 
             ws = request.environ["wsgi.websocket"]
 
@@ -270,7 +270,7 @@ class WebApplication(object):
                 ws.send(themyutils.json.dumps(analytics.analyze(**kwargs)))
 
                 while True:
-                    self.gevent.get_hub().wait(async)
+                    self._wait(waiter)
 
                     if queue.empty():
                         # Just a heartbeat
@@ -301,7 +301,7 @@ class WebApplication(object):
             except self.WebSocketError:
                 pass
             finally:
-                self.queues.remove((queue, async))
+                self.queues.remove((queue, waiter))
 
                 if not ws.closed:
                     ws.close()
@@ -310,7 +310,10 @@ class WebApplication(object):
         else:
             return Response(themyutils.json.dumps(analytics.analyze(**kwargs)), mimetype="application/json")
 
-    def _create_async(self):
+    def _create_waiter(self):
         async = self.gevent.get_hub().loop.async()
         async.start(lambda: None)
         return async
+
+    def _wait(self, waiter):
+        return self.gevent.get_hub().wait(waiter)
