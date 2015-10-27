@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, unicode_literals
 from datetime import datetime, timedelta
 import operator
 from Queue import Queue
-from threading import Thread
+from threading import Lock, Thread
 from werkzeug.exceptions import HTTPException
 from werkzeug.routing import Map, Rule
 from werkzeug.wrappers import Request, Response
@@ -64,6 +64,7 @@ class WebApplication(object):
         self.gevent = None
         self.WebSocketError = None
         self.queues = set()
+        self.gevent_lock = Lock()
 
         self.disorders = {}
         self.disorder_queues = set()
@@ -81,19 +82,23 @@ class WebApplication(object):
                                         self.wsgi_app, handler_class=WebSocketHandler).serve_forever()
 
     def handle(self, record):
-        for queue, waiter in self.queues.copy():
-            queue.put(record)
-            waiter.send()
+        with self.gevent_lock:
+            for queue, waiter in self.queues.copy():
+                queue.put(record)
+                waiter.send()
 
     def heartbeat(self):
-        for queue, waiter in self.queues.copy():
-            waiter.send()
+        with self.gevent_lock:
+            for queue, waiter in self.queues.copy():
+                waiter.send()
 
     def update_disorders(self, disorders):
         self.disorders = disorders
-        for queue, waiter in self.disorder_queues.copy():
-            queue.put(disorders)
-            waiter.send()
+
+        with self.gevent_lock:
+            for queue, waiter in self.disorder_queues.copy():
+                queue.put(disorders)
+                waiter.send()
 
     def wsgi_app(self, environ, start_response):
         request = Request(environ)
