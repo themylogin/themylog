@@ -54,7 +54,7 @@ class BaseHandler(object):
                     else:
                         result.set(value)
             except Exception:
-                logger.getLogger(self.__class__.__name__).error("Exception in persister thread", exc_info=True)
+                logger.getChild(self.__class__.__name__).error("Exception in persister thread", exc_info=True)
                 time.sleep(self.REINITIALIZE_TIMEOUT)
 
     def initialize(self):
