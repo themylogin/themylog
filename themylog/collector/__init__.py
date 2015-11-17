@@ -7,6 +7,7 @@ import sys
 from threading import Thread
 
 import themyutils.json
+from themyutils.subprocess import preexec_fn
 
 from themylog.client import Client
 from themylog.level import levels
@@ -30,7 +31,7 @@ def create_collector_task(collector, client):
         records = []
 
         p = subprocess.Popen([sys.executable, collector.path, collector.name],
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=preexec_fn)
         stdout_stderr = []
 
         def target():

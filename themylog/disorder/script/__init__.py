@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 import themyutils.json
+from themyutils.subprocess import preexec_fn
 
 from themylog.client import Client
 from themylog.disorder.seeker.record_based import RecordBasedSeeker
@@ -87,7 +88,8 @@ def create_script_disorder_seeker(name):
 
 def create_script_disorder_seeker_task(client, path, name):
     def script_disorder_task():
-        p = subprocess.Popen([sys.executable, path, name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen([sys.executable, path, name], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             preexec_fn=preexec_fn)
         stdout, stderr = p.communicate()
 
         if p.returncode == 0:
