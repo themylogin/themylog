@@ -154,6 +154,11 @@ if __name__ == "__main__":
     setup_collector_disorder_seekers(disorder_manager, collectors)
     setup_script_disorder_seekers(disorder_manager, celery, script_disorder_seekers)
 
+    queue = create_persistent_queue("disorder-manager")
+    record_fanout.add_queue(queue)
+
+    start_daemon_thread(functools.partial(handler_thread, disorder_manager, queue))
+
     if web_server:
         disorder_manager.add_observer(web_server)
 

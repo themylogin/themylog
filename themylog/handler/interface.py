@@ -2,7 +2,10 @@ import zope.interface
 
 
 class IHandler(zope.interface.Interface):
-    def handle(self, record):
+    def initialize(self):
+        """Initialize handler"""
+
+    def process(self, record):
         """Persist record to the handler"""
 
 

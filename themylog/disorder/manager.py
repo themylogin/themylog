@@ -20,8 +20,6 @@ class DisorderManager(object):
         else:
             self.retriever = None
 
-        handlers.append(self)
-
         self.seekers = {}
         self.disorders = OrderedDict()
 
@@ -57,7 +55,10 @@ class DisorderManager(object):
         for observer in self.observers:
             observer.update_disorders(self.disorders.copy())
 
-    def handle(self, record):
+    def initialize(self):
+        pass
+
+    def process(self, record):
         for seeker in self.seekers.values():
             seeker.receive_record(record)
 
