@@ -4,13 +4,16 @@ from __future__ import absolute_import, division, unicode_literals
 import argparse
 from celery import Celery
 from celery.app.defaults import DEFAULT_PROCESS_LOG_FMT
+from collections import defaultdict
+import functools
+import itertools
 import logging
-from Queue import Queue
+import os
 import sys
-from threading import Thread
 import time
 
 from themyutils.argparse import LoggingLevelType
+from themyutils.threading import start_daemon_thread
 
 from themylog.cleanup import setup_cleanup
 from themylog.collector import setup_collectors
@@ -27,8 +30,51 @@ from themylog.disorder.collector import setup_collector_disorder_seekers
 from themylog.disorder.script import setup_script_disorder_seekers
 from themylog.feed import IFeedsAware
 from themylog.processor import run_processor
-from themylog.utils.worker_pool import WorkerPool
+from themylog.queues.fanout import Fanout
+from themylog.queues.persistent_queue import PersistentQueue
 from themylog.web_server import setup_web_server
+
+
+def create_persistent_queue(name):
+    path = os.path.join(os.path.expanduser("~/.local/themylog"), "queues", name)
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    return PersistentQueue(path)
+
+
+def receiver_thread(receiver, record_fanout):
+    for record in receiver.receive():
+        record_fanout.put(record)
+
+
+def handler_thread(handler, queue):
+    logger = logging.getLogger("handler.%s" % handler.__class__.__name__)
+
+    while True:
+        try:
+            handler.initialize()
+
+            while True:
+                handler.process(queue.peek())
+                queue.get()
+        except Exception:
+            logger.error("Exception in handler thread", exc_info=True)
+            time.sleep(handler.REINITIALIZE_TIMEOUT)
+
+
+def heartbeat_thread(heartbeats):
+    while True:
+        for heartbeat in heartbeats:
+            heartbeat.heartbeat()
+
+        time.sleep(1)
+
+
+def processor_thread(processor, queue, record_fanout):
+    while True:
+        for record in run_processor(processor, queue.get()):
+            record_fanout.put(record)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -41,42 +87,31 @@ if __name__ == "__main__":
 
     config = read_config(args.config or find_config())
 
-    record_queue = Queue()
+    record_fanout = Fanout()
 
     logger.info("Creating receivers")
 
     receivers = create_receivers(config)
 
-    def receiver_thread_factory(receiver):
-        def receiver_thread():
-            for record in receiver.receive():
-                record_queue.put(record)
-
-        return receiver_thread
-
     for receiver in receivers:
-        receiver_thread = Thread(target=receiver_thread_factory(receiver))
-        receiver_thread.daemon = True
-        receiver_thread.start()
+        start_daemon_thread(functools.partial(receiver_thread, receiver, record_fanout))
 
     logger.info("Creating handlers")
 
     handlers = create_handlers(config)
 
+    handlers_queue_counters = defaultdict(lambda: itertools.count(1))
+    for handler in handlers:
+        queue = create_persistent_queue("handler-%s-%d" % (handler.__class__.__name__,
+                                                           handlers_queue_counters[handler.__class__.__name__].next()))
+        record_fanout.add_queue(queue)
+
+        start_daemon_thread(functools.partial(handler_thread, handler, queue))
+
     logger.info("Starting heartbeat")
 
     heartbeats = []
-
-    def heartbeat_thread_body():
-        while True:
-            for heartbeat in heartbeats:
-                heartbeat.heartbeat()
-
-            time.sleep(1)
-
-    heartbeat_thread = Thread(target=heartbeat_thread_body)
-    heartbeat_thread.daemon = True
-    heartbeat_thread.start()
+    start_daemon_thread(functools.partial(heartbeat_thread, heartbeats))
 
     logger.info("Creating feeds")
 
@@ -125,29 +160,21 @@ if __name__ == "__main__":
     logger.info("Setting up processors")
 
     processors = get_processors(config)
-    processors_pool = WorkerPool("processors")
+
+    for processor in processors:
+        queue = create_persistent_queue("processor-%s" % processor.name)
+        record_fanout.add_queue(queue)
+
+        start_daemon_thread(functools.partial(processor_thread, processor, queue, record_fanout))
 
     logger.info("Starting scheduler")
 
     celery_beat = celery.Beat(loglevel=args.level)
     celery_beat.set_process_title = lambda: None
-    celery_beat_thread = Thread(target=celery_beat.run)
-    celery_beat_thread.daemon = True
-    celery_beat_thread.start()
-
-    celery_worker_thread = Thread(target=celery.WorkController(pool_cls="solo").start)
-    celery_worker_thread.daemon = True
-    celery_worker_thread.start()
+    start_daemon_thread(celery_beat.run)
+    start_daemon_thread(celery.WorkController(pool_cls="solo").start)
 
     logger.info("Running")
 
     while True:
-        record = record_queue.get()
-        logger.debug("Processing record")
-
-        for handler in handlers:
-            handler.handle(record)
-
-        processors_pool.run(lambda: [[record_queue.put(result)
-                                      for result in run_processor(processor, record)]
-                                     for processor in processors])
+        time.sleep(1)
