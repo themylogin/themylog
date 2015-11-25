@@ -41,4 +41,4 @@ class HandlerManager(object):
                     queue.get()
             except Exception:
                 logger.error("Exception in handler thread", exc_info=True)
-                time.sleep(handler.REINITIALIZE_TIMEOUT)
+                time.sleep(5)

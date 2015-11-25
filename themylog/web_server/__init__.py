@@ -19,8 +19,8 @@ from themylog.record.serializer import serialize_json
 from themylog.rules_tree import match_record
 
 
-def setup_web_server(configuration, handlers, heartbeats, feeds, analytics):
-    for handler in handlers:
+def setup_web_server(configuration, handler_manager, heartbeats, feeds, analytics):
+    for handler in handler_manager.handlers.values():
         if IRetrieveCapable.providedBy(handler):
             retriever = handler
             break
@@ -33,7 +33,7 @@ def setup_web_server(configuration, handlers, heartbeats, feeds, analytics):
     thread.daemon = True
     thread.start()
 
-    handlers.append(web_application)
+    handler_manager.add_handler("web_application", web_application)
     heartbeats.append(web_application)
 
     return web_application
@@ -81,7 +81,10 @@ class WebApplication(object):
         return gevent.pywsgi.WSGIServer((self.configuration["host"], self.configuration["port"]),
                                         self.wsgi_app, handler_class=WebSocketHandler).serve_forever()
 
-    def handle(self, record):
+    def initialize(self):
+        pass
+
+    def process(self, record):
         with self.gevent_lock:
             for queue, waiter in self.queues.copy():
                 queue.put(record)

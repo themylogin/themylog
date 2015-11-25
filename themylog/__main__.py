@@ -106,16 +106,13 @@ if __name__ == "__main__":
 
     logger.info("Setting up web server")
 
-    web_server = None
-    if "web_server" in config:
-        web_server = setup_web_server(config["web_server"], handlers, heartbeats, feeds, analytics)
+    web_server = setup_web_server(config["web_server"], handler_manager, heartbeats, feeds, analytics)
 
     logger.info("Creating scheduler")
 
     celery = Celery()
     celery.config_from_object(config["celery"])
-    if web_server:
-        web_server.celery = celery
+    web_server.celery = celery
 
     logger.info("Setting up cleanups")
 
@@ -136,8 +133,7 @@ if __name__ == "__main__":
 
     handler_manager.add_handler("disorder-manager", disorder_manager)
 
-    if web_server:
-        disorder_manager.add_observer(web_server)
+    disorder_manager.add_observer(web_server)
 
     logger.info("Setting up processors")
 

@@ -14,8 +14,6 @@ __all__ = [b"BaseHandler"]
 class BaseHandler(object):
     implements(IHandler)
 
-    REINITIALIZE_TIMEOUT = 5
-
     def initialize(self):
         pass
 
