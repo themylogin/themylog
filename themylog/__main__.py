@@ -29,7 +29,8 @@ from themylog.config.receivers import create_receivers
 from themylog.disorder.collector import setup_collector_disorder_seekers
 from themylog.disorder.script import setup_script_disorder_seekers
 from themylog.feed import IFeedsAware
-from themylog.processor import run_processor
+from themylog.handler.manager import HandlerManager
+from themylog.processor.handler import ProcessorRunner
 from themylog.queue.fanout import Fanout
 from themylog.queue.persistent_queue import PersistentQueue
 from themylog.web_server import setup_web_server
@@ -48,33 +49,12 @@ def receiver_thread(receiver, record_fanout):
         record_fanout.put(record)
 
 
-def handler_thread(handler, queue):
-    logger = logging.getLogger("handler.%s" % handler.__class__.__name__)
-
-    while True:
-        try:
-            handler.initialize()
-
-            while True:
-                handler.process(queue.peek())
-                queue.get()
-        except Exception:
-            logger.error("Exception in handler thread", exc_info=True)
-            time.sleep(handler.REINITIALIZE_TIMEOUT)
-
-
 def heartbeat_thread(heartbeats):
     while True:
         for heartbeat in heartbeats:
             heartbeat.heartbeat()
 
         time.sleep(1)
-
-
-def processor_thread(processor, queue, record_fanout):
-    while True:
-        for record in run_processor(processor, queue.get()):
-            record_fanout.put(record)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -88,6 +68,7 @@ if __name__ == "__main__":
     config = read_config(args.config or find_config())
 
     record_fanout = Fanout()
+    handler_manager = HandlerManager(record_fanout, create_persistent_queue)
 
     logger.info("Creating receivers")
 
@@ -100,13 +81,10 @@ if __name__ == "__main__":
 
     handlers = create_handlers(config)
 
-    handlers_queue_counters = defaultdict(lambda: itertools.count(1))
+    handlers_name_counters = defaultdict(lambda: itertools.count(1))
     for handler in handlers:
-        queue = create_persistent_queue("handler-%s-%d" % (handler.__class__.__name__,
-                                                           handlers_queue_counters[handler.__class__.__name__].next()))
-        record_fanout.add_queue(queue)
-
-        start_daemon_thread(functools.partial(handler_thread, handler, queue))
+        name = "handler-%s-%d" % (handler.__class__.__name__, handlers_name_counters[handler.__class__.__name__].next())
+        handler_manager.add_handler(name, handler)
 
     logger.info("Starting heartbeat")
 
@@ -154,10 +132,7 @@ if __name__ == "__main__":
     setup_collector_disorder_seekers(disorder_manager, collectors)
     setup_script_disorder_seekers(disorder_manager, celery, script_disorder_seekers)
 
-    queue = create_persistent_queue("disorder-manager")
-    record_fanout.add_queue(queue)
-
-    start_daemon_thread(functools.partial(handler_thread, disorder_manager, queue))
+    handler_manager.add_handler("disorder-manager", disorder_manager)
 
     if web_server:
         disorder_manager.add_observer(web_server)
@@ -167,10 +142,7 @@ if __name__ == "__main__":
     processors = get_processors(config)
 
     for processor in processors:
-        queue = create_persistent_queue("processor-%s" % processor.name)
-        record_fanout.add_queue(queue)
-
-        start_daemon_thread(functools.partial(processor_thread, processor, queue, record_fanout))
+        handler_manager.add_handler("processor-%s" % processor.name, ProcessorRunner(processor, record_fanout))
 
     logger.info("Starting scheduler")
 
