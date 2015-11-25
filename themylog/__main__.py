@@ -27,6 +27,7 @@ from themylog.config.handlers import create_handlers
 from themylog.config.processors import get_processors
 from themylog.config.receivers import create_receivers
 from themylog.disorder.collector import setup_collector_disorder_seekers
+from themylog.disorder.internal import setup_internal_disorder_seekers
 from themylog.disorder.script import setup_script_disorder_seekers
 from themylog.feed import IFeedsAware
 from themylog.handler.manager import HandlerManager
@@ -130,6 +131,7 @@ if __name__ == "__main__":
 
     disorder_manager, script_disorder_seekers = get_disorders(config, handlers)
     setup_collector_disorder_seekers(disorder_manager, collectors)
+    setup_internal_disorder_seekers(disorder_manager, handler_manager)
     setup_script_disorder_seekers(disorder_manager, celery, script_disorder_seekers)
 
     handler_manager.add_handler("disorder-manager", disorder_manager)

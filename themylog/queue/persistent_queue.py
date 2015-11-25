@@ -178,7 +178,7 @@ class SafeQueueQueue(object):
     def _init(self, maxsize):
         self.queue = deque()
 
-    def _qsize(self, len=len):
+    def _qsize(self):
         return len(self.queue)
 
     # Put a new item in the queue
@@ -236,7 +236,7 @@ class ThreadsafeQueueBase(SafeQueueQueue):
         # want.
         pass
 
-    def _qsize(self, len=len):
+    def _qsize(self):
         raise NotImplemented
 
     def _put(self, item):
@@ -601,13 +601,7 @@ class PersistentQueue(ThreadsafeQueueBase):
         return self._get_writer().put_nowait(obj)
 
     def _qsize(self):
-        """ Returns ``0`` if a call to ``get`` will block, otherwise returns
-            ``1``.
-            This is done because it would be very slow to load and read all
-            the data files, and ``qsize`` is normally only used to determine
-            if the queue is empty.
-            """
-        return self._get_reader().qsize() > 0 and 1 or 0
+        return self._get_reader().qsize()
 
     def close(self):
         self._reader.close()
