@@ -30,8 +30,8 @@ from themylog.disorder.collector import setup_collector_disorder_seekers
 from themylog.disorder.script import setup_script_disorder_seekers
 from themylog.feed import IFeedsAware
 from themylog.processor import run_processor
-from themylog.queues.fanout import Fanout
-from themylog.queues.persistent_queue import PersistentQueue
+from themylog.queue.fanout import Fanout
+from themylog.queue.persistent_queue import PersistentQueue
 from themylog.web_server import setup_web_server
 
 
