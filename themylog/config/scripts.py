@@ -1,12 +1,10 @@
 # -*- coding=utf-8 -*-
 from __future__ import absolute_import, division, unicode_literals
 
-from collections import namedtuple
 import os
 
 from themylog.annotations import read_annotations
-
-Script = namedtuple("Collector", ["name", "path", "annotations"])
+from themylog.script import Script
 
 
 def find_scripts(directory, annotation_parsers):
@@ -22,6 +20,6 @@ def find_scripts(directory, annotation_parsers):
 
             annotations = read_annotations(open(path).read().decode("utf-8"), annotation_parsers)
 
-            scripts.append(Script(name=name, path=path, annotations=annotations))
+            scripts.append(Script(path, name, annotations))
 
     return scripts

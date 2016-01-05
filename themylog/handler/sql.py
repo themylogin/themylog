@@ -47,9 +47,12 @@ class SQLRecord(Base):
     __table_args__ = tuple(
         Index(index_name(index), *index)
         for index in set(
-            sum(sum([[[combination, combination + ("datetime",)] if "datetime" not in combination else [combination]
-                      for combination in combinations(index_columns, r + 1)]
-                     for r in range(5)], []), [])
+            filter(
+                lambda index: (not ("level" in index and "msg" in index)),
+                sum(sum([[[combination, combination + ("datetime",)] if "datetime" not in combination else [combination]
+                          for combination in combinations(index_columns, r + 1)]
+                         for r in range(5)], []), [])
+            )
         )
     )
 

@@ -3,16 +3,15 @@ from __future__ import absolute_import, division, unicode_literals
 
 from datetime import datetime
 import operator
-import subprocess
 import sys
 
 import themyutils.json
-from themyutils.subprocess import preexec_fn
 
 from themylog.client import Client
 from themylog.disorder.seeker.record_based import RecordBasedSeeker
 from themylog.level import levels
 from themylog.record import Record
+from themylog.script import TimeoutException
 
 
 class Disorder(object):
@@ -45,8 +44,8 @@ def setup_script_disorder_seekers(disorder_manager, celery, script_disorders):
 
         client = Client()
 
-        script_task = celery.task(create_script_disorder_seeker_task(client, script.path, script.name),
-                                  name="script_disorders.%s" % script.name)
+        script_task = celery.task(create_script_disorder_seeker_task(script, client),
+                                  name="script_disorder_seeker.%s" % script.name)
 
         celery.conf.CELERYBEAT_SCHEDULE[script_task.name] = {
             "task":     script_task.name,
@@ -86,39 +85,42 @@ def create_script_disorder_seeker(name):
     )
 
 
-def create_script_disorder_seeker_task(client, path, name):
-    def script_disorder_task():
-        p = subprocess.Popen([sys.executable, path, name], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             preexec_fn=preexec_fn)
-        stdout, stderr = p.communicate()
+def create_script_disorder_seeker_task(script, client):
+    def script_disorder_task(*args, **kwargs):
+        try:
+            result = script.run(*args, **kwargs)
+        except TimeoutException:
+            level = "error"
+            msg = "disorder_checker_timeout"
+            args = {}
+        else:
+            if result.returncode == 0:
+                stdout = result.stdout.strip()
+                if stdout:
+                    disorders = map(themyutils.json.loads, stdout.split("\n"))
 
-        if p.returncode == 0:
-            stdout = stdout.strip()
-            if stdout:
-                disorders = map(themyutils.json.loads, stdout.split("\n"))
-
-                if any(not disorder["ok"] for disorder in disorders):
-                    level = "warning"
-                    msg = "disorder_found"
+                    if any(not disorder["ok"] for disorder in disorders):
+                        level = "warning"
+                        msg = "disorder_found"
+                    else:
+                        level = "info"
+                        msg = "disorder_checked"
+                    args = disorders
                 else:
-                    level = "info"
-                    msg = "disorder_checked"
-                args = disorders
+                    level = "error"
+                    msg = "disorder_checker_returned_nothing"
+                    args = {}
             else:
                 level = "error"
-                msg = "disorder_checker_returned_nothing"
-                args = {}
-        else:
-            level = "error"
-            msg = "disorder_checker_returned_nonzero_exit_code"
-            args = {
-                "code": p.returncode,
-                "stdout": stdout,
-                "stderr": stderr,
-            }
+                msg = "disorder_checker_returned_nonzero_exit_code"
+                args = {
+                    "code": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                }
 
         client.log(Record(datetime=datetime.now(),
-                          application=name,
+                          application=script.name,
                           logger="script_disorder_checker",
                           level=levels[level],
                           msg=msg,

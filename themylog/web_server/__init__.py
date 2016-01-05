@@ -58,7 +58,7 @@ class WebApplication(object):
             Rule("/timeseries/<application>/<logger>", endpoint="timeseries"),
             Rule("/timeseries/<application>/<logger>/<msg>", endpoint="timeseries"),
             Rule("/disorders", endpoint="disorders"),
-            Rule("/run/<any(collector, script_disorder):script_type>/<script>", endpoint="run_script"),
+            Rule("/run/<any(collector, script_disorder_seeker):script_type>/<script>", endpoint="run_script"),
         ])
 
         self.gevent = None
@@ -250,12 +250,10 @@ class WebApplication(object):
         if self.celery is None:
             return Response("Celery is unavailable", 503)
 
-        script_prefix = "%ss" % script_type
-
-        task = self.celery.tasks.get("%s.%s" % (script_prefix, script))
+        task = self.celery.tasks.get("%s.%s" % (script_type, script))
         if task is None:
             return Response("Script does not exist. Available scripts: %s" %
-                            ", ".join([key for key in self.celery.tasks if key.startswith("%s." % script_prefix)]), 404)
+                            ", ".join([key for key in self.celery.tasks if key.startswith("%s." % script_type)]), 404)
 
         task.delay()
         return Response()
