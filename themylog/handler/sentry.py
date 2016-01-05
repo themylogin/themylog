@@ -62,7 +62,7 @@ class Sentry(BaseHandler):
                 dsn = project.key_set.get_or_create()[0].get_dsn()
                 self.projects[record.application] = dsn
 
-            client = Client(dsn)
+            client = Client(dsn, raise_send_errors=True)
             client.capture("raven.events.Message",
                            message=record.msg,
                            formatted=record.explanation or record.msg,
