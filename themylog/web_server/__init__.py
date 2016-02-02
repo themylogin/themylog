@@ -255,7 +255,7 @@ class WebApplication(object):
             return Response("Script does not exist. Available scripts: %s" %
                             ", ".join([key for key in self.celery.tasks if key.startswith("%s." % script_type)]), 404)
 
-        task.delay()
+        task.delay(force=True)
         return Response()
 
     def execute_analytics(self, request, analytics):

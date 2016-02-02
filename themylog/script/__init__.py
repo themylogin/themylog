@@ -34,9 +34,10 @@ class Script(object):
         self.last_run = datetime.min
 
     def run(self, force=False):
-        if "schedule" in self.annotations:
-            if not self.annotations["schedule"].is_due(self.last_run)[0]:
-                raise TooFrequentException
+        if not force:
+            if "schedule" in self.annotations:
+                if not self.annotations["schedule"].is_due(self.last_run)[0]:
+                    raise TooFrequentException
 
         self.last_run = datetime.utcnow()
 
