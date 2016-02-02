@@ -26,9 +26,12 @@ class Sentry(BaseHandler):
         config_file = os.path.expanduser("~/.sentry/sentry.conf.py")
         config = {b"__file__": config_file}
         execfile(config_file, config)
-        settings.configure(**{k: v for k, v in config.iteritems()
-                              if k in ["DATABASES"] or any(k.startswith("%s_" % s)
-                                                           for s in ["AUTH", "SENTRY"])})
+        cfg = {k: v for k, v in config.iteritems()
+               if k in ["DATABASES"] or any(k.startswith("%s_" % s)
+                                            for s in ["AUTH", "CACHE", "SENTRY"])}
+        cfg["LOGGING"] = {"version": 1,
+                          "disable_existing_loggers": False}
+        settings.configure(**cfg)
 
         from sentry.models import Team, Project, Organization
         self.Project = Project
