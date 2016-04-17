@@ -6,8 +6,9 @@ import logging
 import operator
 from sqlalchemy import create_engine
 from sqlalchemy import Column, Index
-from sqlalchemy import BigInteger, DateTime, Integer, PickleType, String, Text
-from sqlalchemy import literal
+from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import literal, literal_column
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import create_session
 from zope.interface import implements
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
-index_columns = ["application", "logger", "datetime", "level", "msg"]
+index_columns = ["application", "logger", "level", "msg"]
 
 
 def index_name(index):
@@ -36,22 +37,23 @@ class SQLRecord(Base):
     __tablename__ = "log"
 
     id          = Column(Integer, primary_key=True)
-    application = Column(String(length=255), nullable=False)
-    logger      = Column(String(length=255), nullable=False)
+    application = Column(Text(), nullable=False)
+    logger      = Column(Text(), nullable=False)
     datetime    = Column(DateTime(), nullable=False)
     level       = Column(Integer(), nullable=False)
-    msg         = Column(String(length=255), nullable=False)
-    args        = Column(PickleType(pickler=themyutils.json), nullable=False)
+    msg         = Column(Text(), nullable=False)
+    args        = Column(JSONB(), nullable=False)
     explanation = Column(Text(), nullable=False)
 
     __table_args__ = tuple(
-        Index(index_name(index), *index)
+        Index(index_name(index) + "_datetime", *(index + (literal_column("datetime desc"),)))
         for index in set(
             filter(
-                lambda index: (not ("level" in index and "msg" in index)),
-                sum(sum([[[combination, combination + ("datetime",)] if "datetime" not in combination else [combination]
-                          for combination in combinations(index_columns, r + 1)]
-                         for r in range(5)], []), [])
+                lambda index: (not (("level" in index and "msg" in index))),
+                sum([[combination
+                      for combination in combinations(index_columns, r + 1)]
+                     for r in range(len(index_columns))],
+                    [])
             )
         )
     )
@@ -77,7 +79,7 @@ class SQL(BaseHandler):
         )
 
         try:
-            Base.metadata.create_all(create_engine(self.dsn))
+            Base.metadata.create_all(self._create_engine())
         except Exception:
             logger.error("An exception occurred while issuing Base.metadata.create_all", exc_info=True)
 
@@ -99,8 +101,13 @@ class SQL(BaseHandler):
     def cleanup(self, rules_tree, older_than):
         self._create_query(rules_tree).filter(SQLRecord.datetime < older_than).delete(synchronize_session=False)
 
+    def _create_engine(self):
+        return create_engine(self.dsn,
+                             json_serializer=themyutils.json.dumps,
+                             json_deserializer=themyutils.json.loads)
+
     def _create_session(self):
-        return create_session(create_engine(self.dsn))
+        return create_session(self._create_engine())
 
     def _create_query(self, rules_tree):
         query = self._create_session().query(SQLRecord)
@@ -108,28 +115,4 @@ class SQL(BaseHandler):
         if rules_tree:
             query = query.filter(self.rules_tree_evaluator.eval(rules_tree))
 
-            index = self._build_index(rules_tree)
-            if index:
-                if "datetime" not in index:
-                    index.append("datetime")
-                query = query.with_hint(SQLRecord, "USE INDEX(%s)" % index_name(index))
-
         return query
-
-    def _build_index(self, rules_tree):
-        if rules_tree[0] == operator.or_ and not any(c is False for c in rules_tree[1:]):
-            return None
-
-        index = []
-        for arg in rules_tree[1:]:
-            if isinstance(arg, tuple):
-                arg_index = self._build_index(arg)
-                if arg_index:
-                    for field in arg_index:
-                        if field in index_columns and field not in index:
-                            index.append(field)
-
-            if callable(arg):
-                arg(lambda field: index.append(field) if field in index_columns and field not in index else None)
-
-        return sorted(index, key=lambda key: index_columns.index(key))
