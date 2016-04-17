@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, unicode_literals
 
-from django.conf import settings
-from django.db import connection
+import json
 import logging
-import os
 from raven import Client
+import requests
+from requests.auth import HTTPBasicAuth
 from zope.interface import implements
 
 from themylog.config.rules_tree import get_rules_tree
@@ -22,48 +22,42 @@ logger = logging.getLogger(__name__)
 class Sentry(BaseHandler):
     implements(IHandler)
 
-    def __init__(self, team, organization, rules_tree):
-        config_file = os.path.expanduser("~/.sentry/sentry.conf.py")
-        config = {b"__file__": config_file}
-        execfile(config_file, config)
-        cfg = {k: v for k, v in config.iteritems()
-               if k in ["DATABASES"] or any(k.startswith("%s_" % s)
-                                            for s in ["AUTH", "CACHE", "SENTRY"])}
-        cfg["LOGGING"] = {"version": 1,
-                          "disable_existing_loggers": False}
-        settings.configure(**cfg)
-
-        from sentry.models import Team, Project, Organization
-        self.Project = Project
-
-        self.team = Team.objects.get(name=team)
-        self.organization = Organization.objects.get(name=organization)
-        self.projects = {}
-
+    def __init__(self, url, organization, team, key, rules_tree):
+        self.url = url
+        self.organization = organization
+        self.team = team
+        self.auth = HTTPBasicAuth(key, "")
         self.rules_tree = get_rules_tree(rules_tree)
+
+        self.dsns = {}
 
         super(Sentry, self).__init__()
 
     def initialize(self):
-        if connection.connection:
-            try:
-                connection.connection.close()
-            except Exception:
-                logger.info("Unable to close connection", exc_info=True)
-
-        try:
-            connection.connection = None
-        except Exception:
-            logger.info("Unable to set connection to None", exc_info=True)
+        pass
 
     def process(self, record):
         if match_record(self.rules_tree, record):
-            dsn = self.projects.get(record.application)
+            dsn = self.dsns.get(record.application)
             if dsn is None:
-                project = self.Project.objects.get_or_create(team=self.team, organization=self.organization,
-                                                             name=record.application)[0]
-                dsn = project.key_set.get_or_create()[0].get_dsn()
-                self.projects[record.application] = dsn
+                projects = requests.get("%s/api/0/projects/" % self.url,
+                                        auth=self.auth).json()
+                for project in projects:
+                    if project["name"] == record.application:
+                        break
+                else:
+                    project = requests.post("%s/api/0/teams/%s/%s/projects/" % (self.url,
+                                                                                self.team,
+                                                                                self.organization),
+                                            auth=self.auth,
+                                            data=json.dumps({"name": record.application})).json()
+
+                for key in requests.get("%s/api/0/projects/%s/%s/keys/" % (self.url,
+                                                                           self.organization,
+                                                                           project["slug"]),
+                                        auth=self.auth).json():
+                    dsn = key["dsn"]["secret"]
+                    self.dsns[record.application] = dsn
 
             client = Client(dsn, raise_send_errors=True)
             client.capture("raven.events.Message",
