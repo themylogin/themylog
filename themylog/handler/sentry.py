@@ -47,9 +47,10 @@ class Sentry(BaseHandler):
                         break
                 else:
                     project = requests.post("%s/api/0/teams/%s/%s/projects/" % (self.url,
-                                                                                self.team,
-                                                                                self.organization),
+                                                                                self.organization,
+                                                                                self.team),
                                             auth=self.auth,
+                                            headers={"Content-type": "application/json"},
                                             data=json.dumps({"name": record.application})).json()
 
                 for key in requests.get("%s/api/0/projects/%s/%s/keys/" % (self.url,
