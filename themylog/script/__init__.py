@@ -55,6 +55,6 @@ class Script(object):
         if not thread.is_alive():
             return ScriptResult(p.returncode, stdout_stderr[0], stdout_stderr[1])
         else:
-            p.terminate()
+            p.kill()
             thread.join()
             raise TimeoutException()
